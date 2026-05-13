@@ -115,8 +115,7 @@ export default function SidebarFilter({ onFilterReady }) {
                 >
                     <option value="">-- SELECT --</option>
                     {events.map(event => (
-                        <option key={event.RoundNumber} value={event.RoundNumber}>
-                            R{event.RoundNumber} - {event.EventName}
+                        <option key={`${event.RoundNumber}-${event.EventName}`} value={event.EventName}>                            R{event.RoundNumber} - {event.EventName}
                         </option>
                     ))}
                 </select>
@@ -230,7 +229,7 @@ export default function SidebarFilter({ onFilterReady }) {
                                                 </div>
 
                                                 <span className="text-xs font-bold uppercase text-white tracking-widest mt-1 italic">
-                                                    {driver?.broadcast_name || 'Driver'}
+                                                    {driver?.full_name || 'Driver'}
                                                 </span>
 
                                                 <span className="text-[9px] font-extrabold uppercase text-gray-500 tracking-wider mt-0.5">

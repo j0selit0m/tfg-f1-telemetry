@@ -56,23 +56,19 @@ async def get_schedule(year: int):
         # Optimizamos el payload enviando solo los campos necesarios para la UI.
         df = schedule[["RoundNumber", "EventName", "Country"]]
 
-        # Saneamiento de datos: Evitamos Errores 500 en la API oficial eliminando
-        # eventos duplicados (como los múltiples test de pretemporada en años de cambio de reglamento, 2026 pej).
-        df_clean = df.drop_duplicates(subset=["RoundNumber", "EventName"])
-
         # Parseo a Array de Objetos para facilitar el renderizado en el Frontend (React).
-        return df_clean.to_dict(orient="records")
+        return df.to_dict(orient="records")
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 # NIVEL 2: Obtener las sesiones de un Gran Premio específico
-@app.get("/api/schedule/{year}/{round}/sessions")
-async def get_sessions(year: int, round: int):
+@app.get("/api/schedule/{year}/{event_name}/sessions")
+async def get_sessions(year: int, event_name: str):
     try:
         # Descarga la información básica del evento
-        event = fastf1.get_event(year, round)
+        event = fastf1.get_event(year, event_name)
 
         sessions = []
 
@@ -105,10 +101,10 @@ async def get_sessions(year: int, round: int):
 
 
 # NIVEL 3: Obtener los Pilotos de una sesión con sus colores de equipo
-@app.get("/api/session/{year}/{round}/{session_name}/drivers")
-async def get_drivers(year: int, round: int, session_name: str):
+@app.get("/api/session/{year}/{event_name}/{session_name}/drivers")
+async def get_drivers(year: int, event_name: str, session_name: str):
     try:
-        session = fastf1.get_session(year, round, session_name)
+        session = fastf1.get_session(year, event_name, session_name)
 
         # Optimización de I/O: Cargamos exclusivamente la tabla de resultados.
         # Deshabilitar la telemetría y meteorología reduce drásticamente el uso de memoria RAM y ancho de banda.
@@ -126,13 +122,13 @@ async def get_drivers(year: int, round: int, session_name: str):
                 {
                     "driver_number": driver_info["DriverNumber"],
                     "abbreviation": driver_info["Abbreviation"],
-                    "broadcast_name": driver_info["BroadcastName"],
+                    "full_name": driver_info["FullName"],
                     "team_name": driver_info["TeamName"],
                     "team_color": f"#{team_color}",  # Pre-formateamos la cadena a un valor CSS válido
                 }
             )
 
-        return drivers_data
+        return sorted(drivers_data, key=lambda x: x["abbreviation"])
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -164,8 +160,8 @@ def format_timedelta(td):
 # =====================================================
 # MOTOR DE DATOS: Análisis detallado por vuelta
 # =====================================================
-@app.get("/api/analysis/{year}/{round}/{session_name}/laps")
-async def get_lap_data(year: int, round: int, session_name: str, drivers: str):
+@app.get("/api/analysis/{year}/{event_name}/{session_name}/laps")
+async def get_lap_data(year: int, event_name: str, session_name: str, drivers: str):
     """
     Endpoint principal para alimentar la tabla de datos y gráficas del Frontend.
     Recibe los parámetros de ruta para ubicar la sesión y un Query Parameter 'drivers'.
@@ -173,7 +169,7 @@ async def get_lap_data(year: int, round: int, session_name: str, drivers: str):
     abreviaturas o nombres (ej: ?drivers=ALO,VER o ?drivers=1,16).
     """
     try:
-        session = fastf1.get_session(year, round, session_name)
+        session = fastf1.get_session(year, event_name, session_name)
 
         # Mantenemos la telemetría pesada desactivada. Para construir la tabla
         # de tiempos y stints solo necesitamos la metadata de la vuelta, no los sensores a 20Hz.
