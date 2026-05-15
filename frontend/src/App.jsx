@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import SidebarFilter from './components/SidebarFilter';
 import TelemetryTable from './components/TelemetryTable';
+import SummaryStatistics from './components/SummaryStatistics'; // ← nuevo
 
 function App() {
   // --- 1. ESTADO GLOBAL ---
@@ -47,8 +48,10 @@ function App() {
         {/* ZONA DE VISUALIZACIÓN DE DATOS */}
         {/* Aquí inyectamos el componente de la tabla, pasándole los filtros actuales.
             La propia tabla maneja sus estados de carga y pantallas vacías de forma independiente. */}
-        <section className="h-[75vh]">
+        <section className="h-[75vh] flex flex-col gap-6">
           <TelemetryTable filters={activeFilters} />
+          <SummaryStatistics filters={activeFilters} />
+
         </section>
 
       </main>
