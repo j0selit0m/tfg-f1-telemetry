@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import SidebarFilter from './components/SidebarFilter';
 import TelemetryTable from './components/TelemetryTable';
-import SummaryStatistics from './components/SummaryStatistics'; // ← nuevo
+import SummaryStatistics from './components/SummaryStatistics';
+import StintAnalysis from './components/StintAnalysis';
 
 function App() {
   // --- 1. ESTADO GLOBAL ---
@@ -51,6 +52,7 @@ function App() {
         <section className="h-[75vh] flex flex-col gap-6">
           <TelemetryTable filters={activeFilters} />
           <SummaryStatistics filters={activeFilters} />
+          <StintAnalysis filters={activeFilters} />
 
         </section>
 
