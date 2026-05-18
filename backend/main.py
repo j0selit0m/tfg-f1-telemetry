@@ -4,6 +4,8 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from telemetry import router as telemetry_router
+
 # =====================================================
 # CONFIGURACIÓN DE LA CACHÉ
 # =====================================================
@@ -41,6 +43,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(telemetry_router)
+
 
 # =====================================================
 # ENDPOINTS: FILTRO DE SELECCIÓN
