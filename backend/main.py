@@ -1,3 +1,4 @@
+import asyncio
 import os
 import fastf1
 import pandas as pd
@@ -105,35 +106,76 @@ async def get_sessions(year: int, event_name: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def lighten_color(hex_color: str, factor: float = 0.4) -> str:
+    """
+    Aclara un color HEX mezclándolo con blanco según el factor dado.
+    factor=0.4 → 40% más claro. Usado para diferenciar compañeros de equipo.
+    """
+    hex_color = hex_color.lstrip("#")
+    r, g, b = int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
+    r = int(r + (255 - r) * factor)
+    g = int(g + (255 - g) * factor)
+    b = int(b + (255 - b) * factor)
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
 # NIVEL 3: Obtener los Pilotos de una sesión con sus colores de equipo
 @app.get("/api/session/{year}/{event_name}/{session_name}/drivers")
 async def get_drivers(year: int, event_name: str, session_name: str):
     try:
         session = fastf1.get_session(year, event_name, session_name)
-
-        # Optimización de I/O: Cargamos exclusivamente la tabla de resultados.
-        # Deshabilitar la telemetría y meteorología reduce drásticamente el uso de memoria RAM y ancho de banda.
-        session.load(telemetry=False, weather=False, messages=False)
+        await asyncio.to_thread(
+            session.load, laps=False, telemetry=False, weather=False, messages=False
+        )
 
         drivers_data = []
+        seen_teams = {}  # rastrea qué equipos ya tienen un piloto asignado
+
         for _, driver_info in session.results.iterrows():
-            # Saneamiento del código de color HEX.
-            # Prevenimos fallos de renderizado en el CSS del Frontend si la API oficial devuelve nulos (NaN)
-            team_color = str(driver_info.get("TeamColor", "ffffff"))
-            if team_color == "nan" or not team_color:
+            team_color = str(driver_info.get("TeamColor", "")).strip().lower()
+            if not team_color or team_color == "nan":
                 team_color = "ffffff"
+
+            try:
+                driver_color = fastf1.plotting.get_driver_color(
+                    driver_info["Abbreviation"], session
+                )
+            except Exception:
+                driver_color = f"#{team_color}"
+
+            # Si el equipo ya tiene un piloto registrado, aclaramos el color
+            # del segundo para diferenciarlos visualmente en las gráficas.
+            team_name = driver_info["TeamName"]
+            if team_name in seen_teams:
+                driver_color = lighten_color(driver_color)
+            else:
+                seen_teams[team_name] = True
 
             drivers_data.append(
                 {
                     "driver_number": driver_info["DriverNumber"],
                     "abbreviation": driver_info["Abbreviation"],
                     "full_name": driver_info["FullName"],
-                    "team_name": driver_info["TeamName"],
-                    "team_color": f"#{team_color}",  # Pre-formateamos la cadena a un valor CSS válido
+                    "team_name": team_name,
+                    "team_color": f"#{team_color}",
+                    "driver_color": driver_color,
                 }
             )
 
-        return sorted(drivers_data, key=lambda x: x["abbreviation"])
+        compound_colors = {}
+        for compound in ["SOFT", "MEDIUM", "HARD", "INTERMEDIATE", "WET"]:
+            try:
+                compound_colors[compound] = fastf1.plotting.get_compound_color(
+                    compound, session
+                )
+            except Exception:
+                compound_colors[compound] = "#888888"
+
+        return {
+            "drivers": sorted(drivers_data, key=lambda x: x["abbreviation"]),
+            "compounds": compound_colors,
+        }
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

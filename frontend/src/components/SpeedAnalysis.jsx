@@ -30,21 +30,9 @@ import {
     ResponsiveContainer,
 } from 'recharts';
 
-const API_BASE   = 'http://localhost:8000/api';
+const API_BASE = 'http://localhost:8000/api';
 const ZOOM_FACTOR = 0.15; // 15% de cambio de rango por tick de rueda
 
-const DRIVER_COLORS = {
-    VER: '#3b82f6', PER: '#60a5fa',
-    LEC: '#dc2626', SAI: '#f87171',
-    HAM: '#34d399', RUS: '#6ee7b7',
-    ALO: '#10b981', STR: '#059669',
-    NOR: '#f97316', PIA: '#fb923c',
-    GAS: '#818cf8', OCO: '#a5b4fc',
-    HUL: '#e5e7eb', MAG: '#d1d5db',
-    BOT: '#8b5cf6', ZHO: '#a78bfa',
-    TSU: '#fbbf24', LAW: '#f59e0b',
-    ALB: '#38bdf8', COL: '#7dd3fc',
-};
 
 // =============================================================================
 // 1. DTOs
@@ -53,22 +41,22 @@ const DRIVER_COLORS = {
 class DataPointDTO {
     constructor(raw = {}) {
         this.distance = typeof raw.distance === 'number' ? raw.distance : 0;
-        this.speed    = typeof raw.speed    === 'number' ? raw.speed    : 0;
+        this.speed = typeof raw.speed === 'number' ? raw.speed : 0;
     }
 }
 
 class DriverTelemetryDTO {
     constructor(driverCode, raw = {}) {
         this.driverCode = driverCode;
-        this.lapNumber  = typeof raw.lap_number === 'number' ? raw.lap_number : 0;
-        this.data       = Array.isArray(raw.data) ? raw.data.map(d => new DataPointDTO(d)) : [];
+        this.lapNumber = typeof raw.lap_number === 'number' ? raw.lap_number : 0;
+        this.data = Array.isArray(raw.data) ? raw.data.map(d => new DataPointDTO(d)) : [];
     }
 }
 
 class CornerDTO {
     constructor(raw = {}) {
-        this.number   = typeof raw.number   === 'number' ? raw.number   : 0;
-        this.letter   = raw.letter ?? '';
+        this.number = typeof raw.number === 'number' ? raw.number : 0;
+        this.letter = raw.letter ?? '';
         this.distance = typeof raw.distance === 'number' ? raw.distance : 0;
     }
     get displayLabel() {
@@ -112,9 +100,9 @@ async function fetchSpeedTelemetry({ year, round, session, driver, laps }, signa
 // =============================================================================
 
 function useSpeedTelemetry(filters, laps = '') {
-    const [data,      setData]      = useState(null);
+    const [data, setData] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
-    const [error,     setError]     = useState(null);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
         if (!filters?.year || !filters?.round || !filters?.session || !filters?.driver) {
@@ -132,7 +120,7 @@ function useSpeedTelemetry(filters, laps = '') {
             .catch(err => { if (err.name !== 'AbortError') setError(err.message ?? 'Error'); })
             .finally(() => setIsLoading(false));
         return () => controller.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filters?.year, filters?.round, filters?.session, filters?.driver, laps]);
 
     return { data, isLoading, error };
@@ -149,7 +137,7 @@ function useSpeedTelemetry(filters, laps = '') {
 
 function useChartZoom(maxDistance) {
     const [domainStart, setDomainStart] = useState(0);
-    const [domainEnd,   setDomainEnd]   = useState(0);
+    const [domainEnd, setDomainEnd] = useState(0);
 
     // Ref que guarda siempre los valores más recientes del dominio.
     // El listener de rueda la lee en lugar de capturar el estado directamente.
@@ -173,23 +161,23 @@ function useChartZoom(maxDistance) {
     // Sincronizamos la ref con el estado en cada render
     useEffect(() => {
         domainRef.current.start = domainStart;
-        domainRef.current.end   = domainEnd;
+        domainRef.current.end = domainEnd;
     }, [domainStart, domainEnd]);
 
     // Helper interno para aplicar un nuevo dominio con clamp
     const applyDomain = useCallback((newStart, newEnd) => {
-        const max   = domainRef.current.max;
+        const max = domainRef.current.max;
         const range = newEnd - newStart;
         let s = newStart;
         let e = newEnd;
-        if (s < 0)   { s = 0;   e = range; }
+        if (s < 0) { s = 0; e = range; }
         if (e > max) { e = max; s = max - range; }
         s = Math.max(0, s);
         e = Math.min(max, e);
         setDomainStart(s);
         setDomainEnd(e);
         domainRef.current.start = s;
-        domainRef.current.end   = e;
+        domainRef.current.end = e;
     }, []);
 
     // Registra el listener de rueda con { passive: false } para poder
@@ -201,8 +189,8 @@ function useChartZoom(maxDistance) {
         function onWheel(e) {
             e.preventDefault(); // Bloquea el scroll de página — solo funciona con passive: false
 
-            const rect       = el.getBoundingClientRect();
-            const chartLeft  = 70;  // ancho del eje Y de Recharts (px)
+            const rect = el.getBoundingClientRect();
+            const chartLeft = 70;  // ancho del eje Y de Recharts (px)
             const chartRight = 30;  // margen derecho (px)
             const chartWidth = rect.width - chartLeft - chartRight;
 
@@ -212,11 +200,11 @@ function useChartZoom(maxDistance) {
             ));
 
             const { start, end } = domainRef.current;
-            const currentRange   = end - start;
+            const currentRange = end - start;
 
             // Scroll hacia arriba = zoom in (rango más pequeño)
             // Scroll hacia abajo  = zoom out (rango más grande)
-            const delta    = e.deltaY > 0 ? 1 : -1;
+            const delta = e.deltaY > 0 ? 1 : -1;
             const newRange = Math.max(100, Math.min(
                 domainRef.current.max,
                 currentRange * (1 + delta * ZOOM_FACTOR)
@@ -224,8 +212,8 @@ function useChartZoom(maxDistance) {
 
             // El punto bajo el cursor se mantiene fijo visualmente
             const mouseDistance = start + mouseRatio * currentRange;
-            const newStart      = mouseDistance - mouseRatio * newRange;
-            const newEnd        = newStart + newRange;
+            const newStart = mouseDistance - mouseRatio * newRange;
+            const newEnd = newStart + newRange;
 
             applyDomain(newStart, newEnd);
         }
@@ -241,7 +229,7 @@ function useChartZoom(maxDistance) {
             active: true,
             startX: e.clientX,
             startDomainStart: domainRef.current.start,
-            startDomainEnd:   domainRef.current.end,
+            startDomainEnd: domainRef.current.end,
         };
     }, []);
 
@@ -249,17 +237,17 @@ function useChartZoom(maxDistance) {
     const handleMouseMove = useCallback((e) => {
         if (!panRef.current.active || !containerRef.current) return;
 
-        const rect       = containerRef.current.getBoundingClientRect();
-        const chartLeft  = 70;
+        const rect = containerRef.current.getBoundingClientRect();
+        const chartLeft = 70;
         const chartWidth = rect.width - chartLeft - 30;
 
         const pixelsDelta = e.clientX - panRef.current.startX;
-        const range       = panRef.current.startDomainEnd - panRef.current.startDomainStart;
+        const range = panRef.current.startDomainEnd - panRef.current.startDomainStart;
         const metersDelta = -(pixelsDelta / chartWidth) * range;
 
         applyDomain(
             panRef.current.startDomainStart + metersDelta,
-            panRef.current.startDomainEnd   + metersDelta
+            panRef.current.startDomainEnd + metersDelta
         );
     }, [applyDomain]);
 
@@ -274,7 +262,7 @@ function useChartZoom(maxDistance) {
         setDomainStart(0);
         setDomainEnd(max);
         domainRef.current.start = 0;
-        domainRef.current.end   = max;
+        domainRef.current.end = max;
     }, []);
 
     // Porcentaje de zoom (100% = vista completa)
@@ -336,11 +324,15 @@ function CustomTooltip({ active, payload, label }) {
 // =============================================================================
 
 export default function SpeedAnalysis({ filters }) {
-    const [lapInput,    setLapInput]    = useState('');
+    const [lapInput, setLapInput] = useState('');
     const [lapsToFetch, setLapsToFetch] = useState('');
 
     const { data, isLoading, error } = useSpeedTelemetry(filters, lapsToFetch);
     const driverKeys = filters?.driver ? filters.driver.split(',') : [];
+    // Lee el color del piloto desde los filtros del Sidebar.
+    // filters.driverColors viene de driver_color del backend (color individual).
+    // Fallback a gris neutro si por algún motivo no llega el color.
+    const getDriverColor = (code) => filters?.driverColors?.[code] ?? '#9ca3af';
     const mergedData = data ? mergeDriverData(data.drivers) : [];
 
     const {
@@ -501,7 +493,7 @@ export default function SpeedAnalysis({ filters }) {
                                     verticalAlign="bottom"
                                     wrapperStyle={{ paddingTop: '10px', fontSize: 12, fontFamily: 'monospace' }}
                                     formatter={value => (
-                                        <span style={{ color: DRIVER_COLORS[value] || '#9ca3af', fontWeight: 'bold' }}>
+                                        <span style={{ color: getDriverColor(value), fontWeight: 'bold' }}>
                                             {value}
                                         </span>
                                     )}
@@ -512,7 +504,7 @@ export default function SpeedAnalysis({ filters }) {
                                         key={code}
                                         type="monotone"
                                         dataKey={code}
-                                        stroke={DRIVER_COLORS[code] || '#9ca3af'}
+                                        stroke={getDriverColor(code)}   // ← antes: DRIVER_COLORS[code] || '#9ca3af'
                                         strokeWidth={2}
                                         dot={false}
                                         isAnimationActive={false}
