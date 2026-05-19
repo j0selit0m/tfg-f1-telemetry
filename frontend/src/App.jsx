@@ -1,62 +1,81 @@
+// App.jsx — Componente raíz. Gestiona el estado global de filtros y la navegación por pestañas.
+// Patrón: Lifting State Up — los filtros suben desde SidebarFilter y se distribuyen a cada vista.
+
 import { useState } from 'react';
-import SidebarFilter from './components/SidebarFilter';
-import TelemetryTable from './components/TelemetryTable';
+import SidebarFilter     from './components/SidebarFilter';
+import TelemetryTable    from './components/TelemetryTable';
 import SummaryStatistics from './components/SummaryStatistics';
-import StintAnalysis from './components/StintAnalysis';
+import StintAnalysis     from './components/StintAnalysis';
+import SpeedAnalysis     from './components/SpeedAnalysis';
+
+
+// Registro declarativo de pestañas. Para añadir una vista nueva basta con importar
+// el componente y añadir un objeto aquí; el render y la barra de tabs se actualizan solos.
+const TABS = [
+  { id: 'lap-data',        label: 'Lap Data',        component: TelemetryTable    },
+  { id: 'session-summary', label: 'Session Summary',  component: SummaryStatistics },
+  { id: 'stint-analysis',  label: 'Stint Analysis',   component: StintAnalysis     },
+  { id: 'speed-telemetry', label: 'Speed Telemetry',  component: SpeedAnalysis     },
+];
+
 
 function App() {
-  // --- 1. ESTADO GLOBAL ---
-  // Guardamos los filtros que el usuario confirma al pulsar el botón de análisis.
-  // Inicialmente es 'null' hasta que el usuario interactúe con el panel lateral.
+  // null mientras el usuario no haya confirmado una sesión desde el Sidebar.
+  // Cada componente hijo es responsable de mostrar su propio estado vacío.
   const [activeFilters, setActiveFilters] = useState(null);
+  const [activeTab, setActiveTab]         = useState(TABS[0].id);
 
-  // --- 2. GESTOR DE EVENTOS (CALLBACK) ---
-  // Esta función se ejecuta cuando el Sidebar envía los datos seleccionados tras la validación.
+  // Callback que recibe SidebarFilter al validar y confirmar la selección de sesión.
   const handleFilterReady = (filters) => {
-    console.log("Filtros recibidos en el Dashboard principal:", filters);
-    // Actualizamos el estado para que el resto de los componentes (como la tabla) se re-rendericen con los nuevos datos.
     setActiveFilters(filters);
   };
 
-  return (
-    // CONTENEDOR PRINCIPAL: Usamos 'flex' para colocar el Sidebar y el área de trabajo lado a lado.
-    // 'min-h-screen' asegura que el fondo negro cubra toda la altura de la ventana del navegador.
-    <div className="flex min-h-screen bg-black text-white font-sans overflow-hidden">
+  const ActiveComponent = TABS.find((tab) => tab.id === activeTab)?.component;
 
-      {/* SECCIÓN 1: MENÚ LATERAL (SIDEBAR) */}
-      {/* Pasamos la función 'handleFilterReady' como 'prop' para establecer comunicación desde el hijo hacia este componente padre */}
+  return (
+    <div className="flex h-screen bg-black text-white font-sans overflow-hidden">
+
+      {/* Sidebar: selección de temporada, GP, sesión y pilotos */}
       <SidebarFilter onFilterReady={handleFilterReady} />
 
-      {/* SECCIÓN 2: ÁREA DE TRABAJO (MAIN DASHBOARD) */}
-      {/* 'flex-1' permite que esta sección ocupe todo el ancho restante de la pantalla */}
-      <main className="flex-1 p-8 overflow-y-auto">
+      <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
 
-        {/* Cabecera Principal (Estilo Telemetría 2010-2012) */}
-        <header className="mb-8 border-b border-gray-800 pb-4">
-          <h1 className="text-4xl font-black italic uppercase tracking-tighter">
-            Performance <span className="text-red-600 font-extrabold">Analysis</span>
-          </h1>
-
-          {/* Subtítulo dinámico: Cambia dependiendo de si el usuario ha enviado filtros o no */}
-          <p className="text-gray-500 font-bold uppercase text-xs tracking-widest mt-1">
-            {activeFilters
-              ? `ACTIVE SESSION: SEASON ${activeFilters.year} | ROUND ${activeFilters.round} | ${activeFilters.session}`
-              : "TELEMETRY SYSTEM: AWAITING SESSION SELECTION..."
-            }
-          </p>
+        <header className="flex items-center gap-3 px-6 py-3 bg-[#111318] border-b border-gray-800 flex-shrink-0">
+          <span className="text-sm font-black italic uppercase tracking-tight text-white">
+            Pit<span className="text-red-600">wall</span>
+          </span>
+          <span className="text-gray-700 text-xs">·</span>
+          <span className="text-xs text-gray-500 uppercase tracking-widest">
+            Formula 1 Data Analysis
+          </span>
         </header>
 
-        {/* ZONA DE VISUALIZACIÓN DE DATOS */}
-        {/* Aquí inyectamos el componente de la tabla, pasándole los filtros actuales.
-            La propia tabla maneja sus estados de carga y pantallas vacías de forma independiente. */}
-        <section className="h-[75vh] flex flex-col gap-6">
-          <TelemetryTable filters={activeFilters} />
-          <SummaryStatistics filters={activeFilters} />
-          <StintAnalysis filters={activeFilters} />
+        {/* Navegación por pestañas generada a partir del array TABS */}
+        <nav className="flex bg-[#111318] border-b border-gray-800 flex-shrink-0">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              aria-selected={activeTab === tab.id}
+              className={[
+                'px-5 py-3 text-xs font-semibold uppercase tracking-widest',
+                'transition-colors duration-150 border-b-2 -mb-px cursor-pointer',
+                activeTab === tab.id
+                  ? 'text-white border-red-600'
+                  : 'text-gray-500 border-transparent hover:text-gray-300 hover:border-gray-600',
+              ].join(' ')}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
 
-        </section>
+        {/* El scroll vive aquí para mantener sidebar y tabs siempre visibles */}
+        <main className="flex-1 overflow-y-auto">
+          {ActiveComponent && <ActiveComponent filters={activeFilters} />}
+        </main>
 
-      </main>
+      </div>
     </div>
   );
 }
