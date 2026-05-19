@@ -2,20 +2,20 @@
 // Patrón: Lifting State Up — los filtros suben desde SidebarFilter y se distribuyen a cada vista.
 
 import { useState } from 'react';
-import SidebarFilter     from './components/SidebarFilter';
-import TelemetryTable    from './components/TelemetryTable';
+import SidebarFilter from './components/SidebarFilter';
+import TelemetryTable from './components/TelemetryTable';
 import SummaryStatistics from './components/SummaryStatistics';
-import StintAnalysis     from './components/StintAnalysis';
-import SpeedAnalysis     from './components/SpeedAnalysis';
+import StintAnalysis from './components/StintAnalysis';
+import SpeedAnalysis from './components/SpeedAnalysis';
 
 
 // Registro declarativo de pestañas. Para añadir una vista nueva basta con importar
 // el componente y añadir un objeto aquí; el render y la barra de tabs se actualizan solos.
 const TABS = [
-  { id: 'lap-data',        label: 'Lap Data',        component: TelemetryTable    },
-  { id: 'session-summary', label: 'Session Summary',  component: SummaryStatistics },
-  { id: 'stint-analysis',  label: 'Stint Analysis',   component: StintAnalysis     },
-  { id: 'speed-telemetry', label: 'Speed Telemetry',  component: SpeedAnalysis     },
+  { id: 'lap-data', label: 'Lap Data', component: TelemetryTable },
+  { id: 'session-summary', label: 'Session Summary', component: SummaryStatistics },
+  { id: 'stint-analysis', label: 'Stint Analysis', component: StintAnalysis },
+  { id: 'speed-telemetry', label: 'Speed Telemetry', component: SpeedAnalysis },
 ];
 
 
@@ -23,7 +23,7 @@ function App() {
   // null mientras el usuario no haya confirmado una sesión desde el Sidebar.
   // Cada componente hijo es responsable de mostrar su propio estado vacío.
   const [activeFilters, setActiveFilters] = useState(null);
-  const [activeTab, setActiveTab]         = useState(TABS[0].id);
+  const [activeTab, setActiveTab] = useState(TABS[0].id);
 
   // Callback que recibe SidebarFilter al validar y confirmar la selección de sesión.
   const handleFilterReady = (filters) => {
@@ -72,7 +72,17 @@ function App() {
 
         {/* El scroll vive aquí para mantener sidebar y tabs siempre visibles */}
         <main className="flex-1 overflow-y-auto">
-          {ActiveComponent && <ActiveComponent filters={activeFilters} />}
+          {TABS.map(tab => {
+            const TabComponent = tab.component;
+            return (
+              <div
+                key={tab.id}
+                style={{ display: activeTab === tab.id ? 'block' : 'none' }}
+              >
+                <TabComponent filters={activeFilters} />
+              </div>
+            );
+          })}
         </main>
 
       </div>

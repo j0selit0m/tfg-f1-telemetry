@@ -1,41 +1,47 @@
 // =============================================================================
 // SpeedAnalysis.jsx
 //
-// RESPONSABILIDAD: Visualización interactiva de telemetría de velocidad.
+// Visualización interactiva de telemetría de velocidad a lo largo de la pista.
 //
-// ZOOM/PAN: Implementado con estado de dominio propio.
-// El zoom cambia el rango visible del eje X (zoom de datos), no escala el SVG.
-//   - Rueda del ratón → acercar/alejar centrado en la posición del cursor
-//   - Arrastrar        → desplazar el rango visible
-//   - Doble click      → resetear al rango completo
+// Zoom/Pan: implementado con estado de dominio propio sobre el eje X.
+//   Al filtrar los datos al rango visible antes de pasarlos a Recharts,
+//   las líneas se desplazan visualmente en lugar de quedarse estáticas.
+//   El listener de rueda se registra con { passive: false } para poder
+//   llamar preventDefault() y evitar que la página haga scroll al mismo tiempo.
 //
-// NOTA TÉCNICA: El listener de rueda se registra manualmente con { passive: false }
-// para poder llamar preventDefault() y evitar que la página haga scroll.
-// Si se usa el onWheel de React, el evento es passive y preventDefault() no funciona.
-//
-// ENDPOINT:
-//   GET /api/telemetry/{year}/{event_name}/{session_name}/speed?drivers=VER,LEC[&laps=44,66]
+// Crosshair: tracking directo del ratón sobre el div contenedor (no eventos
+//   de Recharts, que solo disparan en puntos de datos exactos). La velocidad
+//   de cada piloto se obtiene por interpolación lineal entre los dos puntos
+//   más cercanos al cursor.
 // =============================================================================
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
     Line,
     XAxis,
     YAxis,
     CartesianGrid,
-    Tooltip,
-    Legend,
     ReferenceLine,
     ComposedChart,
     ResponsiveContainer,
+    Legend,
 } from 'recharts';
 
 const API_BASE = 'http://localhost:8000/api';
-const ZOOM_FACTOR = 0.15; // 15% de cambio de rango por tick de rueda
+const ZOOM_FACTOR = 0.15;
 
+// Altura compartida por el div contenedor, el ResponsiveContainer y los estados
+// de carga/vacío. Centralizada para evitar inconsistencias entre los tres.
+const CHART_HEIGHT = 555;
+
+// Ancho estimado del eje Y de Recharts (labels + ticks).
+// Usado para convertir posición de píxeles a metros en el crosshair y el zoom.
+// No corresponde a margin.left (que es 20), sino al área total que ocupa el eje.
+const CHART_MARGIN_LEFT = 70;
+const CHART_MARGIN_RIGHT = 30;
 
 // =============================================================================
-// 1. DTOs
+// 1. DTOs — Modelado de la respuesta del backend
 // =============================================================================
 
 class DataPointDTO {
@@ -84,7 +90,7 @@ class SpeedTelemetryDTO {
 }
 
 // =============================================================================
-// 2. SERVICE
+// 2. SERVICE — Comunicación con el backend
 // =============================================================================
 
 async function fetchSpeedTelemetry({ year, round, session, driver, laps }, signal) {
@@ -120,6 +126,8 @@ function useSpeedTelemetry(filters, laps = '') {
             .catch(err => { if (err.name !== 'AbortError') setError(err.message ?? 'Error'); })
             .finally(() => setIsLoading(false));
         return () => controller.abort();
+        // Las dependencias son primitivas extraídas de filters para evitar que el
+        // objeto completo cause re-ejecuciones innecesarias en cada render del padre.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filters?.year, filters?.round, filters?.session, filters?.driver, laps]);
 
@@ -129,27 +137,25 @@ function useSpeedTelemetry(filters, laps = '') {
 // =============================================================================
 // 4. HOOK — useChartZoom
 //
-// Patrón de ref para el handler de rueda:
-// Guardamos los valores actuales de dominio en una ref y los leemos dentro
-// del listener. Así el listener nunca queda "stale" y no necesitamos
-// re-registrarlo cada vez que cambia el dominio.
+// Gestiona el dominio visible del eje X [start, end] y los eventos de
+// rueda, arrastre y doble clic para zoom y paneo.
+//
+// El listener de rueda se registra mediante un callback ref en lugar de useRef
+// estándar. Un callback ref recibe el nodo DOM en el momento exacto en que
+// aparece en pantalla, evitando el problema de que el useEffect se ejecute
+// antes de que el elemento exista (ya que el gráfico está condicionado a `data`).
 // =============================================================================
 
 function useChartZoom(maxDistance) {
     const [domainStart, setDomainStart] = useState(0);
     const [domainEnd, setDomainEnd] = useState(0);
 
-    // Ref que guarda siempre los valores más recientes del dominio.
-    // El listener de rueda la lee en lugar de capturar el estado directamente.
+    // domainRef permite que el listener de rueda lea siempre el dominio actual
+    // sin necesidad de re-registrarse cada vez que cambia el estado.
     const domainRef = useRef({ start: 0, end: 0, max: 0 });
-
-    // Ref del contenedor DOM para calcular posición del cursor
-    const containerRef = useRef(null);
-
-    // Ref de estado de panning
+    const nodeRef = useRef(null);
     const panRef = useRef({ active: false, startX: 0, startDomainStart: 0, startDomainEnd: 0 });
 
-    // Cuando llegan datos nuevos, inicializamos el dominio al rango completo
     useEffect(() => {
         if (maxDistance && maxDistance > 0) {
             setDomainStart(0);
@@ -158,13 +164,11 @@ function useChartZoom(maxDistance) {
         }
     }, [maxDistance]);
 
-    // Sincronizamos la ref con el estado en cada render
     useEffect(() => {
         domainRef.current.start = domainStart;
         domainRef.current.end = domainEnd;
     }, [domainStart, domainEnd]);
 
-    // Helper interno para aplicar un nuevo dominio con clamp
     const applyDomain = useCallback((newStart, newEnd) => {
         const max = domainRef.current.max;
         const range = newEnd - newStart;
@@ -180,49 +184,54 @@ function useChartZoom(maxDistance) {
         domainRef.current.end = e;
     }, []);
 
-    // Registra el listener de rueda con { passive: false } para poder
-    // llamar preventDefault() y evitar que la página haga scroll al mismo tiempo
-    useEffect(() => {
-        const el = containerRef.current;
-        if (!el) return;
+    // Convierte una posición X del ratón (clientX) a metros sobre la pista.
+    const pixelToDistance = useCallback((clientX) => {
+        if (!nodeRef.current) return null;
+        const rect = nodeRef.current.getBoundingClientRect();
+        const chartWidth = rect.width - CHART_MARGIN_LEFT - CHART_MARGIN_RIGHT;
+        const ratio = Math.max(0, Math.min(1,
+            (clientX - rect.left - CHART_MARGIN_LEFT) / chartWidth
+        ));
+        const { start, end } = domainRef.current;
+        return start + ratio * (end - start);
+    }, []);
+
+    // Callback ref: React lo llama con el nodo cuando el elemento se monta y
+    // con null cuando se desmonta. Registramos el listener aquí para garantizar
+    // que el nodo exista. La referencia al handler se guarda en el propio nodo
+    // para poder eliminarlo en el cleanup sin necesidad de un ref adicional.
+    const containerRef = useCallback((node) => {
+        if (nodeRef.current?._onWheel) {
+            nodeRef.current.removeEventListener('wheel', nodeRef.current._onWheel);
+        }
+        if (!node) { nodeRef.current = null; return; }
 
         function onWheel(e) {
-            e.preventDefault(); // Bloquea el scroll de página — solo funciona con passive: false
-
-            const rect = el.getBoundingClientRect();
-            const chartLeft = 70;  // ancho del eje Y de Recharts (px)
-            const chartRight = 30;  // margen derecho (px)
-            const chartWidth = rect.width - chartLeft - chartRight;
-
-            // Posición del cursor en el área de datos (0 = izquierda, 1 = derecha)
+            e.preventDefault();
+            const rect = node.getBoundingClientRect();
+            const chartWidth = rect.width - CHART_MARGIN_LEFT - CHART_MARGIN_RIGHT;
             const mouseRatio = Math.max(0, Math.min(1,
-                (e.clientX - rect.left - chartLeft) / chartWidth
+                (e.clientX - rect.left - CHART_MARGIN_LEFT) / chartWidth
             ));
-
             const { start, end } = domainRef.current;
             const currentRange = end - start;
-
-            // Scroll hacia arriba = zoom in (rango más pequeño)
-            // Scroll hacia abajo  = zoom out (rango más grande)
             const delta = e.deltaY > 0 ? 1 : -1;
             const newRange = Math.max(100, Math.min(
                 domainRef.current.max,
                 currentRange * (1 + delta * ZOOM_FACTOR)
             ));
-
-            // El punto bajo el cursor se mantiene fijo visualmente
             const mouseDistance = start + mouseRatio * currentRange;
-            const newStart = mouseDistance - mouseRatio * newRange;
-            const newEnd = newStart + newRange;
-
-            applyDomain(newStart, newEnd);
+            applyDomain(
+                mouseDistance - mouseRatio * newRange,
+                mouseDistance - mouseRatio * newRange + newRange
+            );
         }
 
-        el.addEventListener('wheel', onWheel, { passive: false });
-        return () => el.removeEventListener('wheel', onWheel);
-    }, [applyDomain]); // Solo se re-registra si applyDomain cambia (nunca en la práctica)
+        node._onWheel = onWheel;
+        node.addEventListener('wheel', onWheel, { passive: false });
+        nodeRef.current = node;
+    }, [applyDomain]);
 
-    // PAN: inicio del arrastre
     const handleMouseDown = useCallback((e) => {
         if (e.button !== 0) return;
         panRef.current = {
@@ -233,30 +242,20 @@ function useChartZoom(maxDistance) {
         };
     }, []);
 
-    // PAN: movimiento
     const handleMouseMove = useCallback((e) => {
-        if (!panRef.current.active || !containerRef.current) return;
-
-        const rect = containerRef.current.getBoundingClientRect();
-        const chartLeft = 70;
-        const chartWidth = rect.width - chartLeft - 30;
-
-        const pixelsDelta = e.clientX - panRef.current.startX;
+        if (!panRef.current.active || !nodeRef.current) return;
+        const rect = nodeRef.current.getBoundingClientRect();
+        const chartWidth = rect.width - CHART_MARGIN_LEFT - CHART_MARGIN_RIGHT;
         const range = panRef.current.startDomainEnd - panRef.current.startDomainStart;
-        const metersDelta = -(pixelsDelta / chartWidth) * range;
-
+        const delta = -(e.clientX - panRef.current.startX) / chartWidth * range;
         applyDomain(
-            panRef.current.startDomainStart + metersDelta,
-            panRef.current.startDomainEnd + metersDelta
+            panRef.current.startDomainStart + delta,
+            panRef.current.startDomainEnd + delta
         );
     }, [applyDomain]);
 
-    // PAN: fin del arrastre
-    const handleMouseUp = useCallback(() => {
-        panRef.current.active = false;
-    }, []);
+    const handleMouseUp = useCallback(() => { panRef.current.active = false; }, []);
 
-    // Reset al rango completo
     const resetZoom = useCallback(() => {
         const max = domainRef.current.max;
         setDomainStart(0);
@@ -265,7 +264,6 @@ function useChartZoom(maxDistance) {
         domainRef.current.end = max;
     }, []);
 
-    // Porcentaje de zoom (100% = vista completa)
     const zoomPercent = maxDistance && (domainEnd - domainStart) > 0
         ? Math.round((maxDistance / (domainEnd - domainStart)) * 100)
         : 100;
@@ -278,6 +276,7 @@ function useChartZoom(maxDistance) {
         handleMouseUp,
         resetZoom,
         zoomPercent,
+        pixelToDistance,
     };
 }
 
@@ -285,6 +284,9 @@ function useChartZoom(maxDistance) {
 // 5. UTILIDADES
 // =============================================================================
 
+// Fusiona los arrays de datos de todos los pilotos en un único array ordenado
+// por distancia, donde cada entrada contiene la velocidad de cada piloto.
+// Recharts necesita este formato para renderizar múltiples líneas en el mismo eje.
 function mergeDriverData(drivers) {
     const map = {};
     Object.entries(drivers).forEach(([code, driver]) => {
@@ -296,25 +298,81 @@ function mergeDriverData(drivers) {
     return Object.values(map).sort((a, b) => a.distance - b.distance);
 }
 
+/**
+ * Devuelve la velocidad interpolada linealmente para un piloto en una distancia
+ * arbitraria. Al interpolar entre los dos puntos más cercanos, el crosshair
+ * muestra valores continuos en lugar de saltar entre muestras del backend.
+ *
+ * @param {DataPointDTO[]} driverData - Puntos ordenados por distancia ascendente
+ * @param {number} targetDistance - Distancia objetivo en metros
+ * @returns {number|null} Velocidad en km/h redondeada, o null si no hay datos
+ */
+function interpolateSpeed(driverData, targetDistance) {
+    if (!driverData?.length) return null;
+
+    let lo = null;
+    let hi = null;
+
+    for (let i = 0; i < driverData.length; i++) {
+        if (driverData[i].distance <= targetDistance) lo = driverData[i];
+        else { hi = driverData[i]; break; }
+    }
+
+    if (!lo) return hi?.speed ?? null;
+    if (!hi) return lo?.speed ?? null;
+
+    const t = (targetDistance - lo.distance) / (hi.distance - lo.distance);
+    return Math.round(lo.speed + t * (hi.speed - lo.speed));
+}
+
 // =============================================================================
 // 6. SUBCOMPONENTES
 // =============================================================================
 
-function CustomTooltip({ active, payload, label }) {
-    if (!active || !payload?.length) return null;
+/**
+ * Panel de información del crosshair, estilo Tracing Insights.
+ * Muestra la distancia exacta del cursor y la velocidad interpolada de cada piloto.
+ * Se posiciona en la esquina superior derecha del área del gráfico.
+ *
+ * pointer-events: none para que el panel no capture eventos del ratón
+ * e interfiera con el tracking del crosshair o el zoom.
+ */
+function CrosshairPanel({ distance, driverSpeeds, getDriverColor }) {
+    if (distance === null) return null;
+
     return (
-        <div className="bg-[#1a1a2a] border border-red-600/50 rounded p-3 shadow-xl text-xs font-mono min-w-[140px]">
-            <p className="text-gray-400 font-bold uppercase tracking-widest mb-2">
-                {Math.round(label)} m
-            </p>
-            {payload.map(entry => (
-                <div key={entry.name} className="flex justify-between gap-6">
-                    <span style={{ color: entry.color }} className="font-black">{entry.name}</span>
-                    <span className="text-white font-black">
-                        {entry.value != null ? `${Math.round(entry.value)} km/h` : '—'}
-                    </span>
-                </div>
-            ))}
+        <div
+            style={{ position: 'absolute', top: 28, right: 40, zIndex: 20, pointerEvents: 'none' }}
+            className="bg-black/90 border border-gray-700 shadow-xl font-mono text-xs min-w-[200px]"
+        >
+            <div className="border-b border-gray-700 px-3 py-1.5">
+                <span className="text-gray-500 uppercase tracking-widest text-[10px]">Distance</span>
+                <span className="block text-white font-black text-lg tabular-nums">
+                    {Math.round(distance)} m
+                </span>
+            </div>
+
+            <div className="px-3 py-2 flex flex-col gap-2">
+                {Object.entries(driverSpeeds).map(([code, speed]) => (
+                    <div key={code} className="flex items-center justify-between gap-8">
+                        <div className="flex items-center gap-1.5">
+                            <div
+                                className="w-2.5 h-2.5 rounded-full shrink-0"
+                                style={{ backgroundColor: getDriverColor(code) }}
+                            />
+                            <span
+                                className="font-black uppercase tracking-tight text-sm"
+                                style={{ color: getDriverColor(code) }}
+                            >
+                                {code}
+                            </span>
+                        </div>
+                        <span className="text-white font-black tabular-nums text-sm">
+                            {speed !== null ? `${speed} km/h` : '—'}
+                        </span>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 }
@@ -327,13 +385,20 @@ export default function SpeedAnalysis({ filters }) {
     const [lapInput, setLapInput] = useState('');
     const [lapsToFetch, setLapsToFetch] = useState('');
 
+    const [crosshairDistance, setCrosshairDistance] = useState(null);
+    const [crosshairSpeeds, setCrosshairSpeeds] = useState({});
+
     const { data, isLoading, error } = useSpeedTelemetry(filters, lapsToFetch);
     const driverKeys = filters?.driver ? filters.driver.split(',') : [];
-    // Lee el color del piloto desde los filtros del Sidebar.
-    // filters.driverColors viene de driver_color del backend (color individual).
-    // Fallback a gris neutro si por algún motivo no llega el color.
-    const getDriverColor = (code) => filters?.driverColors?.[code] ?? '#9ca3af';
-    const mergedData = data ? mergeDriverData(data.drivers) : [];
+
+    const getDriverColor = useCallback((code) => {
+        return filters.driverColors?.[code] ?? '#9ca3af';
+    }, [filters]);
+
+    const allMergedData = useMemo(
+        () => (data ? mergeDriverData(data.drivers) : []),
+        [data]
+    );
 
     const {
         domain,
@@ -343,17 +408,51 @@ export default function SpeedAnalysis({ filters }) {
         handleMouseUp,
         resetZoom,
         zoomPercent,
+        pixelToDistance,
     } = useChartZoom(data?.maxDistance ?? 0);
+
+    // Filtramos los datos al rango visible antes de pasarlos a Recharts.
+    // Sin este filtrado, Recharts actualiza las etiquetas del eje X pero las
+    // líneas permanecen en sus posiciones originales al hacer zoom.
+    // El buffer del 2% evita que las líneas se corten abruptamente en los bordes.
+    const visibleData = useMemo(() => {
+        if (!allMergedData.length) return [];
+        const buffer = (domain[1] - domain[0]) * 0.02;
+        return allMergedData.filter(
+            d => d.distance >= domain[0] - buffer && d.distance <= domain[1] + buffer
+        );
+    }, [allMergedData, domain]);
 
     const handleApplyLaps = useCallback(() => setLapsToFetch(lapInput.trim()), [lapInput]);
 
-    // ── Standby ──────────────────────────────────────────────────────────────
+    // Gestiona panning y crosshair con un único handler para evitar duplicar
+    // la lógica de conversión píxel → metros.
+    const handleContainerMouseMove = useCallback((e) => {
+        handleMouseMove(e);
+
+        const distance = pixelToDistance(e.clientX);
+        if (distance === null || !data) return;
+
+        setCrosshairDistance(distance);
+
+        const speeds = {};
+        driverKeys.forEach(code => {
+            speeds[code] = interpolateSpeed(data.drivers[code]?.data ?? [], distance);
+        });
+        setCrosshairSpeeds(speeds);
+    }, [handleMouseMove, pixelToDistance, data, driverKeys]);
+
+    const handleContainerMouseLeave = useCallback((e) => {
+        handleMouseUp(e);
+        setCrosshairDistance(null);
+        setCrosshairSpeeds({});
+    }, [handleMouseUp]);
+
     if (!filters) {
         return (
-            <div className="flex h-64 items-center justify-center flex-col opacity-50">
-                <span className="text-6xl mb-4">📈</span>
+            <div className="flex items-center justify-center flex-col opacity-50" style={{ height: CHART_HEIGHT }}>
                 <h2 className="text-2xl font-black italic uppercase tracking-widest text-gray-500">
-                    Speed Analysis Standby
+                    Speed Analysis
                 </h2>
                 <p className="text-sm font-mono text-gray-600 mt-2">
                     Selecciona parámetros y pilotos en el panel lateral.
@@ -365,7 +464,7 @@ export default function SpeedAnalysis({ filters }) {
     return (
         <div className="flex flex-col w-full bg-[#0a0a0c] border border-gray-800 shadow-2xl font-sans text-gray-200">
 
-            {/* ── CABECERA ────────────────────────────────────────────────── */}
+            {/* CABECERA */}
             <div className="bg-gradient-to-r from-gray-900 to-black border-b-2 border-gray-700 px-5 py-3 shrink-0 flex items-center justify-between gap-4">
                 <div>
                     <h3 className="text-red-600 font-black italic uppercase tracking-widest text-xl leading-none">
@@ -396,7 +495,7 @@ export default function SpeedAnalysis({ filters }) {
                 </div>
             </div>
 
-            {/* ── ERROR ───────────────────────────────────────────────────── */}
+            {/* ERROR */}
             {error && !isLoading && (
                 <div className="flex items-center gap-3 border-b border-red-900/60 bg-red-950/20 px-5 py-3">
                     <span className="text-red-500 font-black shrink-0">⚠</span>
@@ -404,11 +503,16 @@ export default function SpeedAnalysis({ filters }) {
                 </div>
             )}
 
-            {/* ── ZONA DE GRÁFICA ─────────────────────────────────────────── */}
+            {/* ÁREA DEL GRÁFICO
+                position: relative necesario para que CrosshairPanel (absolute)
+                se posicione relativo a este contenedor y no a la página. */}
             <div className="relative bg-[#0a0a0c]">
 
                 {isLoading && (
-                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#0a0a0c]/80 backdrop-blur-sm" style={{ height: 420 }}>
+                    <div
+                        className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#0a0a0c]/80 backdrop-blur-sm"
+                        style={{ height: CHART_HEIGHT }}
+                    >
                         <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin mb-4" />
                         <p className="text-red-600 font-mono text-lg uppercase tracking-widest animate-pulse">
                             Generating telemetry...
@@ -417,123 +521,139 @@ export default function SpeedAnalysis({ filters }) {
                 )}
 
                 {!isLoading && data && (
-                    <div
-                        ref={containerRef}
-                        style={{ width: '100%', height: 420, cursor: 'crosshair', userSelect: 'none' }}
-                        onMouseDown={handleMouseDown}
-                        onMouseMove={handleMouseMove}
-                        onMouseUp={handleMouseUp}
-                        onMouseLeave={handleMouseUp}
-                        onDoubleClick={resetZoom}
-                    >
-                        <ResponsiveContainer width="100%" height={420}>
-                            <ComposedChart
-                                data={mergedData}
-                                margin={{ top: 25, right: 30, left: 20, bottom: 45 }}
-                            >
-                                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
+                    <>
+                        <CrosshairPanel
+                            distance={crosshairDistance}
+                            driverSpeeds={crosshairSpeeds}
+                            getDriverColor={getDriverColor}
+                        />
 
-                                {/* domain se actualiza con el estado de zoom —
-                                    esto produce el zoom de datos, no de imagen */}
-                                <XAxis
-                                    dataKey="distance"
-                                    type="number"
-                                    domain={domain}
-                                    stroke="#6b7280"
-                                    tick={{ fill: '#9ca3af', fontSize: 11, fontFamily: 'monospace' }}
-                                    tickFormatter={v => `${Math.round(v)}`}
-                                    label={{
-                                        value: 'Distance (m)',
-                                        position: 'insideBottom',
-                                        offset: -15,
-                                        fill: '#6b7280',
-                                        fontSize: 12,
-                                        fontFamily: 'monospace',
-                                    }}
-                                />
+                        <div
+                            ref={containerRef}
+                            style={{ width: '100%', height: CHART_HEIGHT, cursor: 'crosshair', userSelect: 'none' }}
+                            onMouseDown={handleMouseDown}
+                            onMouseMove={handleContainerMouseMove}
+                            onMouseUp={handleMouseUp}
+                            onMouseLeave={handleContainerMouseLeave}
+                            onDoubleClick={resetZoom}
+                        >
+                            <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
+                                <ComposedChart
+                                    data={visibleData}
+                                    margin={{ top: 25, right: 30, left: 20, bottom: 10 }}
+                                >
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
 
-                                <YAxis
-                                    stroke="#6b7280"
-                                    tick={{ fill: '#9ca3af', fontSize: 11, fontFamily: 'monospace' }}
-                                    label={{
-                                        value: 'Speed (km/h)',
-                                        angle: -90,
-                                        position: 'insideLeft',
-                                        offset: 15,
-                                        fill: '#6b7280',
-                                        fontSize: 12,
-                                        fontFamily: 'monospace',
-                                    }}
-                                />
+                                    <XAxis
+                                        dataKey="distance"
+                                        type="number"
+                                        domain={domain}
+                                        tickCount={10}
+                                        stroke="#6b7280"
+                                        tick={{ fill: '#9ca3af', fontSize: 13, fontFamily: 'monospace' }}
+                                        tickFormatter={v => `${Math.round(v)}`}
+                                        label={{
+                                            value: 'Distance (m)',
+                                            position: 'insideBottom',
+                                            offset: -5,
+                                            fill: '#6b7280',
+                                            fontSize: 14,
+                                            fontFamily: 'monospace',
+                                        }}
+                                    />
 
-                                {data.corners
-                                    .filter(c => c.distance >= domain[0] && c.distance <= domain[1])
-                                    .map(corner => (
+                                    <YAxis
+                                        tickCount={12}
+                                        stroke="#6b7280"
+                                        tick={{ fill: '#9ca3af', fontSize: 13, fontFamily: 'monospace' }}
+                                        label={{
+                                            value: 'Speed (km/h)',
+                                            angle: -90,
+                                            position: 'insideLeft',
+                                            offset: 15,
+                                            fill: '#6b7280',
+                                            fontSize: 14,
+                                            fontFamily: 'monospace',
+                                        }}
+                                    />
+
+                                    {data.corners
+                                        .filter(c => c.distance >= domain[0] && c.distance <= domain[1])
+                                        .map(corner => (
+                                            <ReferenceLine
+                                                key={`c-${corner.number}-${corner.letter}`}
+                                                x={corner.distance}
+                                                stroke="#374151"
+                                                strokeWidth={1}
+                                                label={{
+                                                    value: corner.displayLabel,
+                                                    position: 'top',
+                                                    fill: '#6b7280',
+                                                    fontSize: 12,
+                                                    fontFamily: 'monospace',
+                                                }}
+                                            />
+                                        ))}
+
+                                    {crosshairDistance !== null && (
                                         <ReferenceLine
-                                            key={`c-${corner.number}-${corner.letter}`}
-                                            x={corner.distance}
-                                            stroke="#374151"
-                                            strokeWidth={1}
-                                            label={{
-                                                value: corner.displayLabel,
-                                                position: 'top',
-                                                fill: '#6b7280',
-                                                fontSize: 10,
-                                                fontFamily: 'monospace',
-                                            }}
+                                            x={crosshairDistance}
+                                            stroke="#dc2626"
+                                            strokeWidth={1.5}
+                                            strokeOpacity={0.8}
+                                        />
+                                    )}
+
+                                    <Legend
+                                        verticalAlign="bottom"
+                                        height={30}
+                                        wrapperStyle={{ paddingTop: '15px', fontSize: 12, fontFamily: 'monospace' }}
+                                        formatter={value => (
+                                            <span style={{ color: getDriverColor(value), fontWeight: 'bold' }}>
+                                                {value}
+                                            </span>
+                                        )}
+                                    />
+
+                                    {driverKeys.map(code => (
+                                        <Line
+                                            key={code}
+                                            type="monotone"
+                                            dataKey={code}
+                                            stroke={getDriverColor(code)}
+                                            strokeWidth={2}
+                                            dot={false}
+                                            activeDot={false}
+                                            isAnimationActive={false}
+                                            connectNulls={true}
+                                            name={code}
                                         />
                                     ))}
-
-                                <Tooltip
-                                    content={<CustomTooltip />}
-                                    cursor={{ stroke: '#dc2626', strokeWidth: 1, strokeDasharray: '4 4' }}
-                                />
-
-                                <Legend
-                                    verticalAlign="bottom"
-                                    wrapperStyle={{ paddingTop: '10px', fontSize: 12, fontFamily: 'monospace' }}
-                                    formatter={value => (
-                                        <span style={{ color: getDriverColor(value), fontWeight: 'bold' }}>
-                                            {value}
-                                        </span>
-                                    )}
-                                />
-
-                                {driverKeys.map(code => (
-                                    <Line
-                                        key={code}
-                                        type="monotone"
-                                        dataKey={code}
-                                        stroke={getDriverColor(code)}   // ← antes: DRIVER_COLORS[code] || '#9ca3af'
-                                        strokeWidth={2}
-                                        dot={false}
-                                        isAnimationActive={false}
-                                        connectNulls={true}
-                                        name={code}
-                                    />
-                                ))}
-                            </ComposedChart>
-                        </ResponsiveContainer>
-                    </div>
+                                </ComposedChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </>
                 )}
 
                 {!isLoading && !error && !data && (
-                    <div className="flex items-center justify-center flex-col opacity-50" style={{ height: 420 }}>
-                        <span className="text-5xl mb-3">📊</span>
+                    <div
+                        className="flex items-center justify-center flex-col opacity-50"
+                        style={{ height: CHART_HEIGHT }}
+                    >
                         <p className="text-gray-500 font-black italic uppercase tracking-widest">
-                            Select a session and press Load
+                            Selecciona una sesión y pulsa Load
                         </p>
                     </div>
                 )}
             </div>
 
-            {/* ── BARRA INFERIOR ──────────────────────────────────────────── */}
+            {/* BARRA DE CONTROLES */}
             {data && (
-                <div className="border-t border-gray-800 px-5 py-2 flex items-center justify-between text-[10px] font-mono">
+                <div className="border-t border-gray-800 px-5 py-2 flex items-center justify-between text-xs font-mono">
                     <div className="flex gap-5 text-gray-600">
-                        <span>🖱️ <strong className="text-gray-500">Rueda</strong> → Zoom</span>
-                        <span>🖱️ <strong className="text-gray-500">Arrastrar</strong> → Pan</span>
-                        <span>🖱️ <strong className="text-gray-500">Doble click</strong> → Reset</span>
+                        <span><strong className="text-gray-500">Rueda</strong> → Zoom</span>
+                        <span><strong className="text-gray-500">Arrastrar</strong> → Pan</span>
+                        <span><strong className="text-gray-500">Doble click</strong> → Reset</span>
                     </div>
                     <div className="flex items-center gap-3">
                         <span className="text-gray-600">
