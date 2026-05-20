@@ -97,6 +97,7 @@ export default function SidebarFilter({ onFilterReady }) {
             session: selectedSession,
             driver:  selectedDrivers.join(','),
 
+            availableSessions: sessions.map(s => s.id),
             // Para líneas de gráficas (SpeedAnalysis, LapPace, etc.)
             driverColors: Object.fromEntries(
                 selectedDriverObjects.map(d => [d.abbreviation, d.driver_color])

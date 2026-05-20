@@ -11,105 +11,95 @@ from typing import Optional
 router = APIRouter()
 
 
-@router.get("/api/telemetry/{year}/{event_name}/{session_name}/speed")
-async def get_speed_telemetry(
-    year: int,
-    event_name: str,
-    session_name: str,
-    drivers: str,
-    laps: Optional[str] = None,
-):
+@router.get("/api/telemetry/{year}/{event_name}/speed")
+async def get_speed_telemetry(year: int, event_name: str, drivers: str):
     """
-    Devuelve la telemetría de velocidad por piloto para montar la gráfica Speed vs Distance.
-    El eje X es la distancia en metros (no el tiempo) para una comparación justa entre pilotos.
-    Incluye las posiciones de las curvas del circuito para las líneas verticales del gráfico.
-
-    Query Params:
-      - drivers: abreviaturas separadas por coma (ej: "ALO,VER")
-      - laps:    números de vuelta paralelos a drivers (ej: "44,66").
-                 Si se omite, se usa la vuelta más rápida de cada piloto.
+    Formato del query param drivers: PILOTO:SESION:VUELTA
+    - Con vuelta:   ?drivers=ALO:Race:44,SAI:Qualifying:1
+    - Sin vuelta:   ?drivers=ALO:Race,SAI:Qualifying  → usa fastest lap
+    - Misma sesión: ?drivers=ALO:Race,SAI:Race
     """
     try:
-        session = fastf1.get_session(year, event_name, session_name)
+        # Parseamos "ALO:Race:44,SAI:Qualifying" en una lista de configuraciones.
+        # Separamos driver y session antes del upper() para no romper
+        # el nombre de sesión que FastF1 espera en su capitalización original.
+        driver_configs = []
+        for entry in drivers.split(","):
+            parts = entry.strip().split(":")
+            if len(parts) < 2:
+                raise ValueError(
+                    f"Formato inválido: '{entry}'. Usa PILOTO:SESION o PILOTO:SESION:VUELTA"
+                )
+            driver_configs.append(
+                {
+                    "driver": parts[0].strip().upper(),
+                    "session": parts[1].strip(),  # Race, Qualifying, Sprint...
+                    "lap": int(parts[2].strip()) if len(parts) == 3 else None,
+                }
+            )
 
-        # telemetry=True es obligatorio para acceder a los sensores del coche (20Hz).
-        # weather y messages se desactivan: no aportan nada a este análisis
-        # y aumentarían innecesariamente el tiempo de carga y uso de RAM.
-        await asyncio.to_thread(
-            session.load, telemetry=True, weather=False, messages=False
-        )
+        # Cargamos únicamente las sesiones distintas que aparecen en la petición.
+        # Si ALO y SAI son ambos de Race, solo cargamos Race una vez.
+        unique_sessions = {}
+        for config in driver_configs:
+            session_name = config["session"]
+            if session_name not in unique_sessions:
+                session = fastf1.get_session(year, event_name, session_name)
+                await asyncio.to_thread(
+                    session.load, telemetry=True, weather=False, messages=False
+                )
+                unique_sessions[session_name] = session
 
-        driver_list = [d.strip().upper() for d in drivers.split(",")]
-
-        # Construimos un dict {piloto: número_vuelta} para la selección posterior.
-        # Si laps="44,66" → {"ALO": 44, "VER": 66}
-        # Si laps=None    → {"ALO": None, "VER": None} → se usará pick_fastest()
-        if laps:
-            lap_numbers = [int(n.strip()) for n in laps.split(",")]
-            lap_map = dict(zip(driver_list, lap_numbers))
-        else:
-            lap_map = {d: None for d in driver_list}
-
-        # ---- CURVAS DEL CIRCUITO ----
-        # get_circuit_info() devuelve metadata del trazado: posición de curvas,
-        # sectores de marshal y rotación del mapa. Solo nos interesan las curvas.
-        # Distance indica en qué metro del trazado empieza cada curva,
-        # que es exactamente lo que el Frontend necesita para dibujar
-        # las líneas verticales punteadas del gráfico como en Tracing Insights.
-        circuit_info = session.get_circuit_info()
+        # Las curvas del circuito son las mismas para todas las sesiones del mismo GP.
+        # Tomamos la info de la primera sesión cargada.
+        first_session = next(iter(unique_sessions.values()))
+        circuit_info = first_session.get_circuit_info()
         corners = [
             {
-                "number":   int(row["Number"]),
-                # Letter identifica subvariantes de curva (ej: "A", "B" en chicanes).
-                # strip() limpia espacios y el fallback "" evita NaN en el JSON.
-                "letter":   str(row["Letter"]).strip() if pd.notna(row["Letter"]) else "",
+                "number": int(row["Number"]),
+                "letter": str(row["Letter"]).strip() if pd.notna(row["Letter"]) else "",
                 "distance": round(float(row["Distance"]), 1),
             }
             for _, row in circuit_info.corners.iterrows()
         ]
 
-        response_data = {"corners": corners, "drivers": {}}
+        response_data = {"corners": corners, "drivers": []}
 
-        for driver_abbr in driver_list:
+        for config in driver_configs:
+            driver_abbr = config["driver"]
+            session = unique_sessions[config["session"]]
             driver_laps = session.laps.pick_drivers(driver_abbr)
 
-            # Selección de vuelta: número concreto o fastest por defecto.
-            lap_number = lap_map[driver_abbr]
-            if lap_number is not None:
-                # pick_laps() filtra por número de vuelta de forma nativa.
-                lap = driver_laps.pick_laps(lap_number)
+            if config["lap"] is not None:
+                lap = driver_laps.pick_laps(config["lap"])
                 if lap.empty:
                     response_data["drivers"][driver_abbr] = None
                     continue
-                # iloc[0] convierte el Laps (colección) a un único objeto Lap
-                # necesario para llamar a get_car_data() en la siguiente línea.
                 lap = lap.iloc[0]
             else:
-                # only_by_time=True ignora IsPersonalBest y busca el mínimo puro.
                 lap = driver_laps.pick_fastest(only_by_time=True)
                 if lap is None:
                     response_data["drivers"][driver_abbr] = None
                     continue
 
-            # get_car_data() devuelve los canales del coche: Speed, Throttle,
-            # Brake, DRS, RPM, nGear. Más eficiente que get_telemetry() porque
-            # no fusiona los datos de posición GPS que aquí no necesitamos.
-            # add_distance() integra velocidad × tiempo acumulando la distancia
-            # en metros desde el inicio de la vuelta → eje X de la gráfica.
             car_data = lap.get_car_data().add_distance()
 
-            response_data["drivers"][driver_abbr] = {
-                "lap_number": int(lap["LapNumber"]),
-                # Redondeamos Distance a 1 decimal: reduce el tamaño del JSON
-                # sin perder resolución visual en la gráfica del Frontend.
-                "data": [
-                    {
-                        "distance": round(float(row["Distance"]), 1),
-                        "speed":    int(row["Speed"]),
-                    }
-                    for _, row in car_data.iterrows()
-                ],
-            }
+            key = f"{driver_abbr}:{config['session']}:{int(lap['LapNumber'])}"
+            response_data["drivers"].append(
+                {
+                    "key": key,  # "ALO:Race:44" → identificador único para React
+                    "driver": driver_abbr,
+                    "session": config["session"],
+                    "lap_number": int(lap["LapNumber"]),
+                    "data": [
+                        {
+                            "distance": round(float(row["Distance"]), 1),
+                            "speed": int(row["Speed"]),
+                        }
+                        for _, row in car_data.iterrows()
+                    ],
+                }
+            )
 
         return response_data
 

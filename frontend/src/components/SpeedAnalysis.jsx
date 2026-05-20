@@ -13,6 +13,11 @@
 //   de Recharts, que solo disparan en puntos de datos exactos). La velocidad
 //   de cada piloto se obtiene por interpolación lineal entre los dos puntos
 //   más cercanos al cursor.
+//
+// Selección de vueltas: formato "ALO:Race:44, SAI:Qualifying:1".
+//   El número de vuelta es opcional — si se omite el backend usa la fastest lap
+//   de esa sesión. Al cambiar los filtros del sidebar el input se reinicia
+//   con los valores por defecto (piloto + sesión seleccionada).
 // =============================================================================
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -40,6 +45,8 @@ const CHART_HEIGHT = 555;
 const CHART_MARGIN_LEFT = 70;
 const CHART_MARGIN_RIGHT = 30;
 
+const SESSIONS = ['Race', 'Qualifying', 'FP1', 'FP2', 'FP3', 'Sprint'];
+
 // =============================================================================
 // 1. DTOs — Modelado de la respuesta del backend
 // =============================================================================
@@ -52,8 +59,10 @@ class DataPointDTO {
 }
 
 class DriverTelemetryDTO {
-    constructor(driverCode, raw = {}) {
-        this.driverCode = driverCode;
+    constructor(raw = {}) {
+        this.key = (raw.key ?? '').replaceAll(':', '_'); // SAI_Race_65
+        this.driverCode = raw.driver ?? '';
+        this.session = raw.session ?? '';
         this.lapNumber = typeof raw.lap_number === 'number' ? raw.lap_number : 0;
         this.data = Array.isArray(raw.data) ? raw.data.map(d => new DataPointDTO(d)) : [];
     }
@@ -73,11 +82,13 @@ class CornerDTO {
 class SpeedTelemetryDTO {
     constructor(raw = {}) {
         this.corners = Array.isArray(raw.corners) ? raw.corners.map(c => new CornerDTO(c)) : [];
+        // Indexamos por key para acceso O(1) en crosshair e interpolación
         this.drivers = Object.fromEntries(
-            Object.entries(raw.drivers ?? {}).map(([code, data]) => [
-                code, new DriverTelemetryDTO(code, data),
-            ])
-        );
+            (raw.drivers ?? []).map(d => {
+                const dto = new DriverTelemetryDTO(d);
+                return [dto.key, dto];
+            })
+        )
     }
     get maxDistance() {
         let max = 0;
@@ -93,9 +104,10 @@ class SpeedTelemetryDTO {
 // 2. SERVICE — Comunicación con el backend
 // =============================================================================
 
-async function fetchSpeedTelemetry({ year, round, session, driver, laps }, signal) {
-    let url = `${API_BASE}/telemetry/${year}/${encodeURIComponent(round)}/${encodeURIComponent(session)}/speed?drivers=${driver}`;
-    if (laps && laps.trim()) url += `&laps=${laps}`;
+// driverParam tiene el formato "ALO:Race:44,SAI:Qualifying:1" o "ALO:Race,SAI:Race".
+// La sesión ya no va en el path — cada piloto lleva la suya en el query param.
+async function fetchSpeedTelemetry({ year, round, driverParam }, signal) {
+    const url = `${API_BASE}/telemetry/${year}/${encodeURIComponent(round)}/speed?drivers=${encodeURIComponent(driverParam)}`;
     const res = await fetch(url, { method: 'GET', headers: { Accept: 'application/json' }, signal });
     if (!res.ok) throw new Error(`Error ${res.status}: ${await res.text()}`);
     return new SpeedTelemetryDTO(await res.json());
@@ -105,13 +117,16 @@ async function fetchSpeedTelemetry({ year, round, session, driver, laps }, signa
 // 3. HOOK — useSpeedTelemetry
 // =============================================================================
 
-function useSpeedTelemetry(filters, laps = '') {
+// driverParam reemplaza a los anteriores parámetros driver+session+laps.
+// Contiene toda la información necesaria para la petición en un único string,
+// lo que simplifica las dependencias del efecto y evita fetches dobles.
+function useSpeedTelemetry(filters, driverParam) {
     const [data, setData] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        if (!filters?.year || !filters?.round || !filters?.session || !filters?.driver) {
+        if (!filters?.year || !filters?.round || !driverParam) {
             setData(null);
             return;
         }
@@ -119,17 +134,17 @@ function useSpeedTelemetry(filters, laps = '') {
         setIsLoading(true);
         setError(null);
         fetchSpeedTelemetry(
-            { year: filters.year, round: filters.round, session: filters.session, driver: filters.driver, laps },
+            { year: filters.year, round: filters.round, driverParam },
             controller.signal
         )
             .then(setData)
             .catch(err => { if (err.name !== 'AbortError') setError(err.message ?? 'Error'); })
             .finally(() => setIsLoading(false));
         return () => controller.abort();
-        // Las dependencias son primitivas extraídas de filters para evitar que el
-        // objeto completo cause re-ejecuciones innecesarias en cada render del padre.
+        // Las dependencias son primitivas para evitar re-ejecuciones por
+        // cambios de referencia del objeto filters en el padre.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filters?.year, filters?.round, filters?.session, filters?.driver, laps]);
+    }, [filters?.year, filters?.round, driverParam]);
 
     return { data, isLoading, error };
 }
@@ -289,13 +304,52 @@ function useChartZoom(maxDistance) {
 // Recharts necesita este formato para renderizar múltiples líneas en el mismo eje.
 function mergeDriverData(drivers) {
     const map = {};
-    Object.entries(drivers).forEach(([code, driver]) => {
+    Object.entries(drivers).forEach(([key, driver]) => {
         driver.data.forEach(point => {
             if (!map[point.distance]) map[point.distance] = { distance: point.distance };
-            map[point.distance][code] = point.speed;
+            map[point.distance][key] = point.speed;
         });
     });
-    return Object.values(map).sort((a, b) => a.distance - b.distance);
+    const result = Object.values(map).sort((a, b) => a.distance - b.distance);
+    return result;
+}
+
+/**
+ * Construye el string driverParam para el backend a partir de los filtros
+ * del sidebar. Formato resultante: "ALO:Race,SAI:Race" (sin vuelta → fastest lap).
+ * Se usa como valor por defecto cuando el usuario no ha especificado vueltas.
+ *
+ * @param {string} driverList - "ALO,SAI"
+ * @param {string} session    - "Race"
+ * @returns {string}          - "ALO:Race,SAI:Race"
+ */
+function buildParamFromRows(rows) {
+    return rows
+        .map(r => r.lap ? `${r.driver}:${r.session}:${r.lap}` : `${r.driver}:${r.session}`)
+        .join(',');
+}
+
+/**
+ * Parsea el input del usuario al formato que espera el backend.
+ * Acepta "ALO:Race:44, SAI:Qualifying:1" o "ALO:Race, SAI:Qualifying" (sin vuelta).
+ *
+ * @param {string} input - Texto introducido por el usuario
+ * @returns {string|null} - String para el backend, o null si el formato es inválido
+ */
+function parseDriverInput(input) {
+    const entries = input.split(',').map(s => s.trim()).filter(Boolean);
+    const result = [];
+
+    for (const entry of entries) {
+        const parts = entry.split(':').map(s => s.trim());
+        if (parts.length < 2) return null;
+        const [code, session, lap] = parts;
+        if (!code || !session) return null;
+        if (lap && isNaN(lap)) return null;
+        result.push(lap ? `${code}:${session}:${lap}` : `${code}:${session}`);
+    }
+
+    return result.length > 0 ? result.join(',') : null;
 }
 
 /**
@@ -377,23 +431,120 @@ function CrosshairPanel({ distance, driverSpeeds, getDriverColor }) {
     );
 }
 
+function LapSelector({ rows, setRows, availableDrivers, availableSessions, onLoad, isLoading }) {
+    const addRow = () => setRows(prev => [
+        ...prev,
+        { driver: availableDrivers[0], session: 'Race', lap: '' }
+    ]);
+
+    const removeRow = (i) => setRows(prev => prev.filter((_, idx) => idx !== i));
+
+    const updateRow = (i, field, value) =>
+        setRows(prev => prev.map((r, idx) => idx === i ? { ...r, [field]: value } : r));
+
+    return (
+        <div className="flex flex-col gap-2">
+            {rows.map((row, i) => (
+                <div key={i} className="flex items-center gap-2">
+                    <select
+                        value={row.driver}
+                        onChange={e => updateRow(i, 'driver', e.target.value)}
+                        className="bg-gray-900 border border-gray-700 text-gray-300 text-xs px-2 py-1.5 focus:border-red-600 focus:outline-none font-mono"
+                    >
+                        {availableDrivers.map(d => (
+                            <option key={d} value={d}>{d}</option>
+                        ))}
+                    </select>
+
+                    <select
+                        value={row.session}
+                        onChange={e => updateRow(i, 'session', e.target.value)}
+                        className="bg-gray-900 border border-gray-700 text-gray-300 text-xs px-2 py-1.5 focus:border-red-600 focus:outline-none font-mono"
+                    >
+                        {availableSessions.map(s => (
+                            <option key={s} value={s}>{s}</option>
+                        ))}
+                    </select>
+
+                    <input
+                        type="number"
+                        placeholder="Nº lap"
+                        title="Leave empty for fastest lap"
+                        value={row.lap}
+                        onChange={e => updateRow(i, 'lap', e.target.value)}
+                        className="bg-gray-900 border border-gray-700 text-gray-300 text-xs px-2 py-1.5 focus:border-red-600 focus:outline-none font-mono w-20"
+                    />
+
+                    <button
+                        onClick={() => removeRow(i)}
+                        disabled={rows.length === 1}
+                        className="text-gray-600 hover:text-red-500 disabled:opacity-20 transition-colors font-mono text-sm"
+                    >
+                        ✕
+                    </button>
+                </div>
+            ))}
+
+            <div className="flex items-center gap-2 mt-1">
+                <button
+                    onClick={addRow}
+                    className="border border-gray-700 text-gray-500 px-2 py-1 text-[10px] font-bold uppercase tracking-widest hover:border-gray-500 hover:text-white transition-colors"
+                >
+                    + ADD
+                </button>
+                <button
+                    onClick={onLoad}
+                    disabled={isLoading}
+                    className="border border-gray-700 text-gray-500 px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:border-red-600 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                    {isLoading ? '···' : '↻ LOAD'}
+                </button>
+            </div>
+        </div>
+    );
+}
+
 // =============================================================================
 // 7. COMPONENTE PRINCIPAL
 // =============================================================================
 
 export default function SpeedAnalysis({ filters }) {
-    const [lapInput, setLapInput] = useState('');
-    const [lapsToFetch, setLapsToFetch] = useState('');
+    const [rows, setRows] = useState([]);
+    const [driverParam, setDriverParam] = useState('');
+    const [fastestKeys, setFastestKeys] = useState(new Set()); // keys sin vuelta especificada
+
 
     const [crosshairDistance, setCrosshairDistance] = useState(null);
     const [crosshairSpeeds, setCrosshairSpeeds] = useState({});
 
-    const { data, isLoading, error } = useSpeedTelemetry(filters, lapsToFetch);
-    const driverKeys = filters?.driver ? filters.driver.split(',') : [];
+    // Cuando cambian los filtros del sidebar, reconstruimos el input con los
+    // valores por defecto (todos los pilotos con la sesión seleccionada)
+    // y lanzamos el fetch automáticamente sin que el usuario pulse LOAD.
+    const availableDrivers = filters?.driver ? filters.driver.split(',').map(s => s.trim()) : [];
 
-    const getDriverColor = useCallback((code) => {
-        return filters.driverColors?.[code] ?? '#9ca3af';
-    }, [filters]);
+    useEffect(() => {
+        if (!filters?.driver || !filters?.session) return;
+        const defaultRows = availableDrivers.map(code => ({
+            driver: code, session: filters.session, lap: '',
+        }));
+        setRows(defaultRows);
+        setDriverParam(buildParamFromRows(defaultRows));
+        setFastestKeys(new Set()); // se recalcula en el load
+    }, [filters?.year, filters?.round, filters?.driver, filters?.session]);
+
+    const { data, isLoading, error } = useSpeedTelemetry(filters, driverParam);
+
+    // driverKeys = ["ALO:Race:44", "ALO:Race:65"] — claves únicas para las Lines
+    const driverKeys = useMemo(
+        () => data ? Object.keys(data.drivers) : [],
+        [data]
+    );
+
+    // El color se obtiene del driverCode real, no de la key
+    const getDriverColor = useCallback((key) => {
+        const code = data?.drivers[key]?.driverCode ?? key.split(':')[0];
+        return filters?.driverColors?.[code] ?? '#9ca3af';
+    }, [filters, data]);
 
     const allMergedData = useMemo(
         () => (data ? mergeDriverData(data.drivers) : []),
@@ -423,7 +574,15 @@ export default function SpeedAnalysis({ filters }) {
         );
     }, [allMergedData, domain]);
 
-    const handleApplyLaps = useCallback(() => setLapsToFetch(lapInput.trim()), [lapInput]);
+    const handleLoad = useCallback(() => {
+        const param = buildParamFromRows(rows);
+        // Guardamos qué entradas son fastest (lap vacío) para la leyenda
+        const fastest = new Set(
+            rows.filter(r => !r.lap).map(r => `${r.driver}_${r.session}`)
+        );
+        setFastestKeys(fastest);
+        setDriverParam(param);
+    }, [rows]);
 
     // Gestiona panning y crosshair con un único handler para evitar duplicar
     // la lógica de conversión píxel → metros.
@@ -436,8 +595,8 @@ export default function SpeedAnalysis({ filters }) {
         setCrosshairDistance(distance);
 
         const speeds = {};
-        driverKeys.forEach(code => {
-            speeds[code] = interpolateSpeed(data.drivers[code]?.data ?? [], distance);
+        driverKeys.forEach(key => {
+            speeds[key] = interpolateSpeed(data.drivers[key]?.data ?? [], distance);
         });
         setCrosshairSpeeds(speeds);
     }, [handleMouseMove, pixelToDistance, data, driverKeys]);
@@ -470,29 +629,24 @@ export default function SpeedAnalysis({ filters }) {
                     <h3 className="text-red-600 font-black italic uppercase tracking-widest text-xl leading-none">
                         Speed Telemetry
                     </h3>
+                    {/* Sesión y vuelta por piloto — pueden ser distintas entre entradas */}
                     <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest mt-1">
-                        {filters.round} · {filters.session} · Season {filters.year}
-                        {data && Object.values(data.drivers).map(d => ` · ${d.driverCode} L${d.lapNumber}`)}
+                        {filters.round} · Season {filters.year}
+                        {data && Object.values(data.drivers).map(d => {
+                            const sessionShort = d.session === 'Race' ? 'R' : d.session === 'Qualifying' ? 'Q' : d.session.slice(0, 2);
+                            return ` · ${d.driverCode} (${sessionShort}, L${d.lapNumber})`;
+                        })}
                     </p>
                 </div>
 
-                <div className="flex items-center gap-2">
-                    <input
-                        type="text"
-                        placeholder="Laps (ej: 44,66)"
-                        value={lapInput}
-                        onChange={e => setLapInput(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && handleApplyLaps()}
-                        className="bg-gray-900 border border-gray-700 text-gray-300 text-xs px-3 py-1.5 focus:border-red-600 focus:outline-none font-mono w-36"
-                    />
-                    <button
-                        onClick={handleApplyLaps}
-                        disabled={isLoading}
-                        className="border border-gray-700 text-gray-500 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest hover:border-red-600 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                    >
-                        {isLoading ? '···' : '↻ LOAD'}
-                    </button>
-                </div>
+                <LapSelector
+                    rows={rows}
+                    setRows={setRows}
+                    availableDrivers={availableDrivers}
+                    availableSessions={filters?.availableSessions ?? []}
+                    onLoad={handleLoad}
+                    isLoading={isLoading}
+                />
             </div>
 
             {/* ERROR */}
@@ -608,11 +762,19 @@ export default function SpeedAnalysis({ filters }) {
                                         verticalAlign="bottom"
                                         height={30}
                                         wrapperStyle={{ paddingTop: '15px', fontSize: 12, fontFamily: 'monospace' }}
-                                        formatter={value => (
-                                            <span style={{ color: getDriverColor(value), fontWeight: 'bold' }}>
-                                                {value}
-                                            </span>
-                                        )}
+                                        formatter={value => {
+                                            const driver = data?.drivers[value];
+                                            if (!driver) return value;
+                                            // La key transformada sin número: ALO_Race (para comparar con fastestKeys)
+                                            const baseKey = `${driver.driverCode}_${driver.session}`;
+                                            const isFastest = fastestKeys.has(baseKey);
+                                            const lapLabel = isFastest ? `L${driver.lapNumber} Fastest` : `L${driver.lapNumber}`;
+                                            return (
+                                                <span style={{ color: getDriverColor(value), fontWeight: 'bold' }}>
+                                                    {`${driver.driverCode} (${driver.session}, ${lapLabel})`}
+                                                </span>
+                                            );
+                                        }}
                                     />
 
                                     {driverKeys.map(code => (
