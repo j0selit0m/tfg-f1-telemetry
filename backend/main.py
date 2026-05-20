@@ -7,9 +7,10 @@ import asyncio
 import os
 import fastf1
 import pandas as pd
-from fastapi import FastAPI, HTTPException, Path
+from fastapi import FastAPI, HTTPException, Path, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+
 
 from telemetry import router as telemetry_router
 
@@ -285,90 +286,207 @@ async def get_drivers(
     )
 
 
-# Función auxiliar para convertir Timedelta a formato "Minutos:Segundos.Milisegundos"
-def format_timedelta(td):
+"""
+Módulo de análisis de vueltas por sesión.
+
+Expone el endpoint de datos de vuelta, pre-agrupados por número de vuelta
+para que el frontend pueda renderizar la tabla directamente sin transformaciones.
+"""
+
+
+# ── Caché en memoria ──────────────────────────────────────────────────────────
+#
+# Misma estrategia que telemetry.py: evita recargar la sesión si ya fue
+# solicitada. Aquí cargamos sin telemetría ya que solo necesitamos metadata.
+#
+_session_cache: dict[str, fastf1.core.Session] = {}
+
+
+async def _load_session(
+    year: int, event_name: str, session_name: str
+) -> fastf1.core.Session:
+    """Carga una sesión sin telemetría usando caché en memoria."""
+    cache_key = f"{year}_{event_name}_{session_name}"
+    if cache_key not in _session_cache:
+        session = fastf1.get_session(year, event_name, session_name)
+        await asyncio.to_thread(
+            session.load, telemetry=False, weather=False, messages=False
+        )
+        _session_cache[cache_key] = session
+    return _session_cache[cache_key]
+
+
+# ── DTOs ──────────────────────────────────────────────────────────────────────
+
+
+class LapDTO(BaseModel):
+    """Datos de una vuelta individual de un piloto."""
+
+    lap_time: str | None = Field(None, description="Tiempo total en formato M:SS.mmm")
+    lap_time_seconds: float | None = Field(
+        None, description="Tiempo en segundos para gráficas y ordenación"
+    )
+    is_fastest_lap: bool = Field(
+        False, description="True solo en la vuelta más rápida del piloto"
+    )
+    sector1: str | None = Field(None, description="Sector 1 en formato SS.mmm")
+    sector2: str | None = Field(None, description="Sector 2 en formato SS.mmm")
+    sector3: str | None = Field(None, description="Sector 3 en formato SS.mmm")
+    compound: str | None = Field(
+        None, description="SOFT, MEDIUM, HARD, INTERMEDIATE, WET"
+    )
+    tyre_life: int | None = Field(None, description="Vueltas de vida del neumático")
+    stint: int | None = Field(None, description="Número de stint")
+    position: int | None = Field(
+        None, description="Posición en pista al finalizar la vuelta"
+    )
+    track_status: str | None = Field(
+        None, description="1=verde · 2=VSC · 4=SC · 5=roja"
+    )
+    is_personal_best: bool = Field(
+        ...,
+        description="FastF1 puede marcarlo True en múltiples vueltas. Usar is_fastest_lap para destacar una sola.",
+    )
+    is_accurate: bool = Field(..., description="False si es in/out lap o hay SC/VSC")
+    deleted: bool = Field(..., description="Vuelta eliminada por los comisarios")
+    pit_in: bool = Field(..., description="El piloto entró a boxes en esta vuelta")
+    pit_out: bool = Field(..., description="El piloto salió de boxes en esta vuelta")
+
+
+class LapRowDTO(BaseModel):
+    """Fila de la tabla: una vuelta con los datos de todos los pilotos seleccionados."""
+
+    lap_number: int
+    entries: dict[str, LapDTO | None] = Field(
+        ...,
+        description="Mapa abbreviation → LapDTO. None si el piloto no tiene dato para esa vuelta.",
+    )
+
+
+class LapsResponseDTO(BaseModel):
     """
-    Parsea los objetos Timedelta de Pandas a Strings legibles.
-    Resuelve la incompatibilidad de serialización JSON y delega
-    el coste de cálculo de formato al backend en lugar del cliente (React).
+    Respuesta pre-agrupada para renderizado directo en el frontend.
+    'drivers' define el orden de las columnas; 'laps' define las filas.
     """
-    # Gestión de abandonos o sectores no completados (NaT en Pandas -> null en JSON)
+
+    drivers: list[str] = Field(
+        ..., description="Abreviaturas en el mismo orden que el request"
+    )
+    laps: list[LapRowDTO]
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+
+def _format_timedelta(td) -> str | None:
+    """Convierte un Timedelta de Pandas a string legible M:SS.mmm o SS.mmm.
+
+    Resuelve la incompatibilidad de serialización JSON de los objetos Timedelta
+    y delega el formateo al backend para no cargar al cliente React.
+    """
     if pd.isna(td):
         return None
-
     total_seconds = td.total_seconds()
     minutes = int(total_seconds // 60)
     seconds = int(total_seconds % 60)
     milliseconds = int((total_seconds * 1000) % 1000)
-
-    # Formato condicional: M:SS.mmm para vueltas completas, SS.mmm para sectores cortos.
-    # Se aplica zero-padding (ej. :02d) para mantener la alineación tabular en el Frontend.
     if minutes > 0:
         return f"{minutes}:{seconds:02d}.{milliseconds:03d}"
-    else:
-        return f"{seconds}.{milliseconds:03d}"
+    return f"{seconds}.{milliseconds:03d}"
 
 
-# =====================================================
-# MOTOR DE DATOS: Análisis detallado por vuelta
-# =====================================================
-@app.get("/api/analysis/{year}/{event_name}/{session_name}/laps")
-async def get_lap_data(year: int, event_name: str, session_name: str, drivers: str):
+def _build_lap_dto(lap: pd.Series) -> LapDTO:
+    """Serializa una fila del DataFrame de FastF1 al DTO de vuelta.
+
+    Realiza casting explícito a tipos primitivos Python para evitar que los
+    tipos nativos de NumPy (int64, bool_) rompan el serializador JSON de FastAPI.
     """
-    Endpoint principal para alimentar la tabla de datos y gráficas del Frontend.
-    Recibe los parámetros de ruta para ubicar la sesión y un Query Parameter 'drivers'.
-    La API soporta identificadores flexibles separados por coma: dorsales,
-    abreviaturas o nombres (ej: ?drivers=ALO,VER o ?drivers=1,16).
+    total_s = lap["LapTime"].total_seconds() if pd.notna(lap["LapTime"]) else None
+    return LapDTO(
+        lap_time=_format_timedelta(lap["LapTime"]),
+        lap_time_seconds=round(total_s, 3) if total_s is not None else None,
+        is_fastest_lap=False,  # se sobreescribe tras agrupar
+        sector1=_format_timedelta(lap["Sector1Time"]),
+        sector2=_format_timedelta(lap["Sector2Time"]),
+        sector3=_format_timedelta(lap["Sector3Time"]),
+        compound=str(lap["Compound"]) if pd.notna(lap["Compound"]) else None,
+        tyre_life=int(lap["TyreLife"]) if pd.notna(lap["TyreLife"]) else None,
+        stint=int(lap["Stint"]) if pd.notna(lap["Stint"]) else None,
+        position=int(lap["Position"]) if pd.notna(lap["Position"]) else None,
+        track_status=str(lap["TrackStatus"]) if pd.notna(lap["TrackStatus"]) else None,
+        is_personal_best=bool(lap["IsPersonalBest"]),
+        is_accurate=bool(lap["IsAccurate"]),
+        deleted=bool(lap["Deleted"]),
+        pit_in=pd.notna(lap["PitInTime"]),
+        pit_out=pd.notna(lap["PitOutTime"]),
+    )
+
+
+# ── Endpoint ──────────────────────────────────────────────────────────────────
+
+
+@app.get(
+    "/api/analysis/{year}/{event_name}/{session_name}/laps",
+    response_model=LapsResponseDTO,
+    tags=["Análisis"],
+    summary="Datos de vuelta agrupados por número de vuelta",
+)
+async def get_lap_data(
+    year: int = Path(..., ge=MIN_YEAR, le=MAX_YEAR, description="Temporada F1"),
+    event_name: str = Path(..., min_length=2, description="Nombre del Gran Premio"),
+    session_name: str = Path(
+        ..., description="Tipo de sesión: Race, Qualifying, Practice 1…"
+    ),
+    drivers: str = Query(
+        ...,
+        description="Abreviaturas de pilotos separadas por coma",
+        example="ALO,SAI,VER",
+    ),
+) -> LapsResponseDTO:
+    """
+    Devuelve los datos de vuelta agrupados por número de vuelta,
+    listos para renderizar una tabla donde filas = vueltas y columnas = pilotos.
+
+    El campo 'entries' de cada fila contiene un mapa piloto → datos,
+    con None si el piloto no tiene registro para esa vuelta concreta.
     """
     try:
-        session = fastf1.get_session(year, event_name, session_name)
-
-        # Mantenemos la telemetría pesada desactivada. Para construir la tabla
-        # de tiempos y stints solo necesitamos la metadata de la vuelta, no los sensores a 20Hz.
-        session.load(telemetry=False, weather=False, messages=False)
-
-        # Parseo del Query Parameter (String) a Lista nativa
-        driver_list = drivers.split(",")
-
-        # Filtrado vectorizado: La función pick_drivers es multipropósito y cruzará
-        # automáticamente nuestra lista (ej. ['ALO', 'SAI']) con la base de datos.
-        laps = session.laps.pick_drivers(driver_list)
-
-        response_data = []
-
-        for _, lap in laps.iterrows():
-            # Construcción del Payload.
-            # CRÍTICO: Se realiza un "Casting" explícito a tipos primitivos de Python (int, bool).
-            # Los tipos nativos de Numpy/Pandas (int64, bool_) rompen el serializador JSON de FastAPI.
-            lap_data = {
-                "Driver": lap["Driver"],
-                "LapNumber": int(lap["LapNumber"])
-                if pd.notna(lap["LapNumber"])
-                else None,
-                "Position": int(lap["Position"]) if pd.notna(lap["Position"]) else None,
-                # Delegamos el cálculo matemático del tiempo a la función auxiliar
-                "LapTime": format_timedelta(lap["LapTime"]),
-                "Sector1": format_timedelta(lap["Sector1Time"]),
-                "Sector2": format_timedelta(lap["Sector2Time"]),
-                "Sector3": format_timedelta(lap["Sector3Time"]),
-                "Compound": lap["Compound"],
-                "TyreLife": int(lap["TyreLife"]) if pd.notna(lap["TyreLife"]) else None,
-                "Stint": int(lap["Stint"]) if pd.notna(lap["Stint"]) else None,
-                "TrackStatus": lap["TrackStatus"],
-                # Booleanos para el renderizado condicional de la UI (ej. tachar vueltas no válidas)
-                "IsPersonalBest": bool(lap["IsPersonalBest"]),
-                "Deleted": bool(lap["Deleted"]),
-                "IsAccurate": bool(lap["IsAccurate"]),
-                # Separación de Pit In/Out para controlar el estado exacto del neumático en la UI
-                "PitOut": pd.notna(lap["PitOutTime"]),
-                "PitIn": pd.notna(lap["PitInTime"]),
-            }
-            response_data.append(lap_data)
-
-        return response_data
-
+        session = await _load_session(year, event_name, session_name)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=404, detail=f"Sesión no encontrada: {e}")
+
+    driver_list = [d.strip().upper() for d in drivers.split(",")]
+    laps = session.laps.pick_drivers(driver_list)
+
+    # Agrupamos por número de vuelta: {lap_number: {driver: LapDTO}}
+    grouped: dict[int, dict[str, LapDTO]] = {}
+    for _, lap in laps.iterrows():
+        if pd.isna(lap["LapNumber"]):
+            continue
+        lap_number = int(lap["LapNumber"])
+        driver = str(lap["Driver"])
+        if lap_number not in grouped:
+            grouped[lap_number] = {}
+        grouped[lap_number][driver] = _build_lap_dto(lap)
+
+    # Marcamos is_fastest_lap=True usando pick_fastest de FastF1
+    for driver in driver_list:
+        fastest = laps.pick_drivers(driver).pick_fastest(only_by_time=True)
+        if fastest is not None and pd.notna(fastest["LapNumber"]):
+            lap_num = int(fastest["LapNumber"])
+            if lap_num in grouped and driver in grouped[lap_num]:
+                grouped[lap_num][driver].is_fastest_lap = True
+
+    # Construimos las filas ordenadas, rellenando con None los pilotos sin dato
+    lap_rows = [
+        LapRowDTO(
+            lap_number=lap_num,
+            entries={driver: grouped[lap_num].get(driver) for driver in driver_list},
+        )
+        for lap_num in sorted(grouped)
+    ]
+
+    return LapsResponseDTO(drivers=driver_list, laps=lap_rows)
 
 
 # =====================================================

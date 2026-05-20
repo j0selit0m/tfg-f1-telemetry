@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import SidebarFilter from './components/SidebarFilter';
-import TelemetryTable from './components/TelemetryTable';
+import LapDataGrid from './components/LapDataGrid';
 import SummaryStatistics from './components/SummaryStatistics';
 import StintAnalysis from './components/StintAnalysis';
 import TelemetryView  from './components/TelemetryView';
@@ -12,7 +12,7 @@ import TelemetryView  from './components/TelemetryView';
 // Registro declarativo de pestañas. Para añadir una vista nueva basta con importar
 // el componente y añadir un objeto aquí; el render y la barra de tabs se actualizan solos.
 const TABS = [
-  { id: 'lap-data', label: 'Lap Data', component: TelemetryTable },
+  { id: 'lap-data', label: 'Lap Data', component: LapDataGrid },
   { id: 'session-summary', label: 'Session Summary', component: SummaryStatistics },
   { id: 'stint-analysis', label: 'Stint Analysis', component: StintAnalysis },
   { id: 'speed-telemetry', label: 'Speed Telemetry', component: TelemetryView  },
