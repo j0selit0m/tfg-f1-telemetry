@@ -249,7 +249,7 @@ const CHANNEL_CONFIG = {
     speed: { field: 'speed', fmt: v => `${Math.round(v)} km/h` },
     throttle: { field: 'throttle', fmt: v => `${Math.round(v)}%` },
     brake: { field: 'brake', fmt: v => v >= 0.5 ? 'ON' : 'OFF' },
-    rpm: { field: 'rpm', fmt: v => Math.round(v).toLocaleString() },
+    rpm: { field: 'rpm', fmt: v => `${Math.round(v)}` },
     gear: { field: 'gear', fmt: v => `${Math.round(v)}` },
     drs: { field: 'drsActive', fmt: v => v >= 0.5 ? 'OPEN' : '—' },
 };
@@ -345,7 +345,7 @@ function LapSelector({ rows, setRows, availableDrivers, availableSessions, onLoa
 
 // Registra el listener de rueda con { passive: false } y propaga
 // los eventos de ratón compartidos al sistema de zoom/pan.
-function ChartWrapper({ height, buildWheelHandler, handleMouseDown, handleMouseMove, handleMouseUp, onDoubleClick, onMouseLeave, children }) {
+const ChartWrapper = memo(function ChartWrapper({ height, buildWheelHandler, handleMouseDown, handleMouseMove, handleMouseUp, onDoubleClick, onMouseLeave, children }) {
     const nodeRef = useRef(null);
 
     useEffect(() => {
@@ -369,9 +369,9 @@ function ChartWrapper({ height, buildWheelHandler, handleMouseDown, handleMouseM
             {children}
         </div>
     );
-}
+});
 
-function ChannelChart({ title, visibleData, driverKeys, domain, crosshairDistance, corners, getDriverColor, drivers, channel, yLabel, yDomain, height, showXAxis, interaction }) {
+const ChannelChart = memo(function ChannelChart({ title, visibleData, driverKeys, domain, crosshairDistance, corners, getDriverColor, drivers, channel, yLabel, yDomain, height, showXAxis, interaction }) {
     const visibleCorners = corners.filter(c => c.distance >= domain[0] && c.distance <= domain[1]);
     return (
         <div className="border-b border-gray-800/60">
@@ -436,9 +436,9 @@ function ChannelChart({ title, visibleData, driverKeys, domain, crosshairDistanc
             </div>
         </div>
     );
-}
+});
 
-function BinaryChart({ title, visibleData, driverKeys, domain, crosshairDistance, corners, getDriverColor, drivers, channel, yLabel, showXAxis, height, interaction }) {
+const BinaryChart = memo(function BinaryChart({ title, visibleData, driverKeys, domain, crosshairDistance, corners, getDriverColor, drivers, channel, yLabel, showXAxis, height, interaction }) {
     const visibleCorners = corners.filter(c => c.distance >= domain[0] && c.distance <= domain[1]);
     return (
         <div className="border-b border-gray-800/60">
@@ -510,9 +510,9 @@ function BinaryChart({ title, visibleData, driverKeys, domain, crosshairDistance
             </div>
         </div>
     );
-}
+});
 
-function GearChart({ title, visibleData, driverKeys, domain, crosshairDistance, corners, getDriverColor, drivers, showXAxis, height, interaction }) {
+const GearChart = memo(function GearChart({ title, visibleData, driverKeys, domain, crosshairDistance, corners, getDriverColor, drivers, showXAxis, height, interaction }) {
     const visibleCorners = corners.filter(c => c.distance >= domain[0] && c.distance <= domain[1]);
     return (
         <div className="border-b border-gray-800/60">
@@ -584,7 +584,7 @@ function GearChart({ title, visibleData, driverKeys, domain, crosshairDistance, 
             </div>
         </div>
     );
-}
+});
 
 // ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
 
@@ -663,7 +663,6 @@ export default function TelemetryView({ filters }) {
         visibleData,
         driverKeys,
         domain,
-        crosshairDistance,
         corners: data?.corners ?? [],
         getDriverColor,
         drivers: data?.drivers ?? {},
@@ -742,16 +741,22 @@ export default function TelemetryView({ filters }) {
             {!isLoading && data && (
                 <div className="relative">
                     <ChannelChart {...sharedProps}
+                        crosshairDistance={crosshairDistance}
                         title="Speed" channel="speed" yLabel="km/h" height={420} showXAxis />
                     <ChannelChart {...sharedProps}
+                        crosshairDistance={crosshairDistance}
                         title="Throttle" channel="throttle" yLabel="%" height={250} yDomain={[0, 100]} showXAxis />
                     <BinaryChart {...sharedProps}
+                        crosshairDistance={crosshairDistance}
                         title="Brake" channel="brake" yLabel="Brake" height={180} showXAxis />
                     <ChannelChart {...sharedProps}
+                        crosshairDistance={crosshairDistance}
                         title="RPM" channel="rpm" yLabel="RPM" height={250} showXAxis />
                     <GearChart {...sharedProps}
+                        crosshairDistance={crosshairDistance}
                         title="Gear" height={220} showXAxis />
                     <BinaryChart {...sharedProps}
+                        crosshairDistance={crosshairDistance}
                         title="DRS" channel="drs" yLabel="DRS" height={180} showXAxis />
                 </div>
             )}
