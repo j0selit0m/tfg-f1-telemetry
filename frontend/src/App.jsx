@@ -6,7 +6,7 @@ import SidebarFilter from './components/SidebarFilter';
 import TelemetryTable from './components/TelemetryTable';
 import SummaryStatistics from './components/SummaryStatistics';
 import StintAnalysis from './components/StintAnalysis';
-import SpeedAnalysis from './components/SpeedAnalysis';
+import TelemetryView  from './components/SpeedAnalysis';
 
 
 // Registro declarativo de pestañas. Para añadir una vista nueva basta con importar
@@ -15,7 +15,7 @@ const TABS = [
   { id: 'lap-data', label: 'Lap Data', component: TelemetryTable },
   { id: 'session-summary', label: 'Session Summary', component: SummaryStatistics },
   { id: 'stint-analysis', label: 'Stint Analysis', component: StintAnalysis },
-  { id: 'speed-telemetry', label: 'Speed Telemetry', component: SpeedAnalysis },
+  { id: 'speed-telemetry', label: 'Speed Telemetry', component: TelemetryView  },
 ];
 
 
