@@ -1,42 +1,95 @@
+"""
+TFG Formula 1 API — Tracing Insights
+Backend de análisis de telemetría F1 con FastAPI + FastF1.
+"""
+
 import asyncio
 import os
 import fastf1
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Path
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 
 from telemetry import router as telemetry_router
 
-# =====================================================
-# CONFIGURACIÓN DE LA CACHÉ
-# =====================================================
-# Definimos la ruta en el HDD externo (E:)
-HDD_DRIVE_LETTER = "E:"
-CACHE_FOLDER_NAME = "TFG_F1_Cache"
-HDD_PATH = os.path.join(HDD_DRIVE_LETTER + os.sep, CACHE_FOLDER_NAME)
 
-if not os.path.exists(HDD_DRIVE_LETTER + os.sep):
-    print(f"⚠️ ADVERTENCIA: No se detecta {HDD_DRIVE_LETTER}. Usando caché local.")
-    FINAL_CACHE_PATH = "fastf1_cache_local"
-else:
-    if not os.path.exists(HDD_PATH):
-        os.makedirs(HDD_PATH)
-    FINAL_CACHE_PATH = HDD_PATH
-    print(f"✅ Caché configurada en: {FINAL_CACHE_PATH}")
+# ── Configuración de caché ────────────────────────────────────────────────────
 
-# Activación global. A partir de aquí, FastF1 intercepta las peticiones de red y lee de disco.
-fastf1.Cache.enable_cache(FINAL_CACHE_PATH)
+_HDD_PATH = os.path.join("E:" + os.sep, "TFG_F1_Cache")
+_LOCAL_PATH = "fastf1_cache_local"
 
-# =====================================================
-# INICIALIZACIÓN DE LA API Y SEGURIDAD (CORS)
-# =====================================================
 
-# Habilitamos CORS (Cross-Origin Resource Sharing) para autorizar explícitamente
-# el tráfico entre el cliente local (puerto 5173) y este servidor (puerto 8000),
-# resolviendo la restricción de seguridad por la política de mismo origen del navegador.
+def _setup_cache() -> str:
+    """Selecciona la ruta de caché: HDD externo si está disponible, local si no."""
+    if os.path.exists("E:" + os.sep):
+        os.makedirs(_HDD_PATH, exist_ok=True)
+        print(f"✅ Caché en HDD: {_HDD_PATH}")
+        return _HDD_PATH
+    print(f"⚠️  HDD no detectado. Usando caché local: {_LOCAL_PATH}")
+    return _LOCAL_PATH
 
-app = FastAPI(title="TFG Formula 1 API - Tracing Insights Model")
 
+fastf1.Cache.enable_cache(_setup_cache())
+
+
+# ── Constantes ────────────────────────────────────────────────────────────────
+
+MIN_YEAR = 2018
+MAX_YEAR = 2025  # Actualizar con cada nueva temporada
+
+COMPOUNDS = ["SOFT", "MEDIUM", "HARD", "INTERMEDIATE", "WET"]
+
+
+# ── DTOs (Contratos Backend → Frontend) ──────────────────────────────────────
+
+
+class EventDTO(BaseModel):
+    """Gran Premio del calendario de una temporada."""
+
+    round_number: int = Field(..., description="Número de ronda en la temporada")
+    event_name: str = Field(..., description="Nombre oficial del Gran Premio")
+    country: str = Field(..., description="País del circuito")
+
+
+class SessionDTO(BaseModel):
+    """Sesión disponible dentro de un Gran Premio."""
+
+    id: str = Field(
+        ..., description="Identificador de sesión: R, Q, FP1, FP2, FP3, S, SS"
+    )
+    date: str | None = Field(None, description="Fecha en formato ISO 8601")
+
+
+class DriverDTO(BaseModel):
+    """Piloto con sus colores de equipo para las visualizaciones del frontend."""
+
+    driver_number: str
+    abbreviation: str
+    full_name: str
+    team_name: str
+    team_color: str = Field(..., description="Color primario del equipo en HEX")
+    driver_color: str = Field(..., description="Color diferenciado por piloto en HEX")
+
+
+class DriversResponseDTO(BaseModel):
+    """Pilotos y colores de compuestos de una sesión."""
+
+    drivers: list[DriverDTO]
+    compounds: dict[str, str] = Field(
+        ..., description="Mapa compuesto → color HEX oficial F1"
+    )
+
+
+# ── Inicialización de la app ──────────────────────────────────────────────────
+
+app = FastAPI(
+    title="TFG Formula 1 API",
+    description="Backend de análisis de telemetría F1, inspirado en Tracing Insights.",
+    version="1.0.0",
+)
+
+# CORS: autoriza el tráfico del cliente React local (puerto 5173)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
@@ -48,68 +101,21 @@ app.add_middleware(
 app.include_router(telemetry_router)
 
 
-# =====================================================
-# ENDPOINTS: FILTRO DE SELECCIÓN
-# =====================================================
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 
-# NIVEL 1: Obtener el calendario de la temporada
-@app.get("/api/schedule/{year}")
-async def get_schedule(year: int):
-    try:
-        schedule = fastf1.get_event_schedule(year)
+def _lighten_color(hex_color: str, factor: float = 0.4) -> str:
+    """Aclara un color HEX mezclándolo con blanco.
 
-        # Optimizamos el payload enviando solo los campos necesarios para la UI.
-        df = schedule[["RoundNumber", "EventName", "Country"]]
+    Usado para diferenciar visualmente a los compañeros de equipo en las gráficas,
+    ya que comparten el mismo color base de equipo.
 
-        # Parseo a Array de Objetos para facilitar el renderizado en el Frontend (React).
-        return df.to_dict(orient="records")
+    Args:
+        hex_color: Color en formato HEX, con o sin '#'.
+        factor: Intensidad del aclarado (0.0 = sin cambio, 1.0 = blanco puro).
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# NIVEL 2: Obtener las sesiones de un Gran Premio específico
-@app.get("/api/schedule/{year}/{event_name}/sessions")
-async def get_sessions(year: int, event_name: str):
-    try:
-        # Descarga la información básica del evento
-        event = fastf1.get_event(year, event_name)
-
-        sessions = []
-
-        # Buscamos dinámicamente cuántas sesiones existen realmente en el objeto
-        # Filtramos las claves que empiezan por 'Session' seguidas de un número (ej: 'Session1')
-        session_keys = [
-            key
-            for key in event.index
-            if key.startswith("Session") and key[-1].isdigit()
-        ]
-
-        for key in session_keys:
-            session_name = event.get(key)
-            session_date = event.get(f"{key}Date")
-
-            if pd.notna(session_name):
-                sessions.append(
-                    {
-                        "id": session_name,
-                        # Convertimos a ISO 8601 para que el parser de fechas de JS (React) lo consuma nativamente
-                        "date": session_date.isoformat()
-                        if pd.notna(session_date)
-                        else None,
-                    }
-                )
-
-        return sessions
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-def lighten_color(hex_color: str, factor: float = 0.4) -> str:
-    """
-    Aclara un color HEX mezclándolo con blanco según el factor dado.
-    factor=0.4 → 40% más claro. Usado para diferenciar compañeros de equipo.
+    Returns:
+        Color aclarado en formato HEX con '#'.
     """
     hex_color = hex_color.lstrip("#")
     r, g, b = int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
@@ -119,65 +125,164 @@ def lighten_color(hex_color: str, factor: float = 0.4) -> str:
     return f"#{r:02x}{g:02x}{b:02x}"
 
 
-# NIVEL 3: Obtener los Pilotos de una sesión con sus colores de equipo
-@app.get("/api/session/{year}/{event_name}/{session_name}/drivers")
-async def get_drivers(year: int, event_name: str, session_name: str):
+def _normalize_hex(raw: str, fallback: str = "ffffff") -> str:
+    """Normaliza y valida un color HEX recibido de FastF1.
+
+    FastF1 puede devolver valores vacíos, 'nan' o sin el prefijo '#'.
+    """
+    color = str(raw).strip().lower()
+    return color if color and color != "nan" else fallback
+
+
+# ── Endpoints: Filtros de sesión (SidebarFilter del frontend) ─────────────────
+
+
+@app.get(
+    "/api/schedule/{year}",
+    response_model=list[EventDTO],
+    tags=["Filtros"],
+    summary="Calendario de una temporada",
+)
+async def get_schedule(
+    year: int = Path(..., ge=MIN_YEAR, le=MAX_YEAR, description="Temporada F1"),
+) -> list[EventDTO]:
+    """Devuelve todos los Grandes Premios de una temporada.
+
+    FastF1 es síncrono, por lo que se delega en un thread pool
+    para no bloquear el event loop de FastAPI.
+    """
+    try:
+        schedule = await asyncio.to_thread(fastf1.get_event_schedule, year)
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"No se pudo obtener el calendario de FastF1: {e}",
+        )
+
+    return [
+        EventDTO(
+            round_number=int(row["RoundNumber"]),
+            event_name=str(row["EventName"]),
+            country=str(row["Country"]),
+        )
+        for _, row in schedule.iterrows()
+    ]
+
+
+@app.get(
+    "/api/schedule/{year}/{event_name}/sessions",
+    response_model=list[SessionDTO],
+    tags=["Filtros"],
+    summary="Sesiones de un Gran Premio",
+)
+async def get_sessions(
+    year: int = Path(..., ge=MIN_YEAR, le=MAX_YEAR, description="Temporada F1"),
+    event_name: str = Path(..., min_length=2, description="Nombre del Gran Premio"),
+) -> list[SessionDTO]:
+    """Devuelve las sesiones disponibles para un Gran Premio específico.
+
+    Detecta dinámicamente las claves 'SessionN' del objeto Event de FastF1,
+    lo que garantiza compatibilidad con formatos de fin de semana no estándar
+    (ej: Sprint, Sprint Shootout).
+    """
+    try:
+        event = await asyncio.to_thread(fastf1.get_event, year, event_name)
+    except Exception as e:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Gran Premio '{event_name}' ({year}) no encontrado: {e}",
+        )
+
+    session_keys = [
+        k for k in event.index if k.startswith("Session") and k[-1].isdigit()
+    ]
+
+    return [
+        SessionDTO(
+            id=str(event.get(key)),
+            date=event.get(f"{key}Date").isoformat()
+            if pd.notna(event.get(f"{key}Date"))
+            else None,
+        )
+        for key in session_keys
+        if pd.notna(event.get(key))
+    ]
+
+
+@app.get(
+    "/api/session/{year}/{event_name}/{session_name}/drivers",
+    response_model=DriversResponseDTO,
+    tags=["Filtros"],
+    summary="Pilotos y colores de compuestos de una sesión",
+)
+async def get_drivers(
+    year: int = Path(..., ge=MIN_YEAR, le=MAX_YEAR, description="Temporada F1"),
+    event_name: str = Path(..., min_length=2, description="Nombre del Gran Premio"),
+    session_name: str = Path(
+        ..., description="Tipo de sesión: R, Q, FP1, FP2, FP3, S, SS"
+    ),
+) -> DriversResponseDTO:
+    """Devuelve los pilotos de una sesión con sus colores para las gráficas.
+
+    Cuando dos pilotos comparten equipo, el segundo recibe una versión aclarada
+    del color de equipo para poder diferenciarlos visualmente.
+
+    Carga la sesión sin telemetría ni datos de vuelta para minimizar
+    la latencia de este endpoint de selección.
+    """
     try:
         session = fastf1.get_session(year, event_name, session_name)
         await asyncio.to_thread(
             session.load, laps=False, telemetry=False, weather=False, messages=False
         )
-
-        drivers_data = []
-        seen_teams = {}  # rastrea qué equipos ya tienen un piloto asignado
-
-        for _, driver_info in session.results.iterrows():
-            team_color = str(driver_info.get("TeamColor", "")).strip().lower()
-            if not team_color or team_color == "nan":
-                team_color = "ffffff"
-
-            try:
-                driver_color = fastf1.plotting.get_driver_color(
-                    driver_info["Abbreviation"], session
-                )
-            except Exception:
-                driver_color = f"#{team_color}"
-
-            # Si el equipo ya tiene un piloto registrado, aclaramos el color
-            # del segundo para diferenciarlos visualmente en las gráficas.
-            team_name = driver_info["TeamName"]
-            if team_name in seen_teams:
-                driver_color = lighten_color(driver_color)
-            else:
-                seen_teams[team_name] = True
-
-            drivers_data.append(
-                {
-                    "driver_number": driver_info["DriverNumber"],
-                    "abbreviation": driver_info["Abbreviation"],
-                    "full_name": driver_info["FullName"],
-                    "team_name": team_name,
-                    "team_color": f"#{team_color}",
-                    "driver_color": driver_color,
-                }
-            )
-
-        compound_colors = {}
-        for compound in ["SOFT", "MEDIUM", "HARD", "INTERMEDIATE", "WET"]:
-            try:
-                compound_colors[compound] = fastf1.plotting.get_compound_color(
-                    compound, session
-                )
-            except Exception:
-                compound_colors[compound] = "#888888"
-
-        return {
-            "drivers": sorted(drivers_data, key=lambda x: x["abbreviation"]),
-            "compounds": compound_colors,
-        }
-
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=404,
+            detail=f"Sesión '{session_name}' de '{event_name}' ({year}) no encontrada: {e}",
+        )
+
+    drivers: list[DriverDTO] = []
+    seen_teams: set[str] = set()
+
+    for _, info in session.results.iterrows():
+        team_color = _normalize_hex(info.get("TeamColor", ""))
+
+        try:
+            driver_color = fastf1.plotting.get_driver_color(
+                info["Abbreviation"], session
+            )
+        except Exception:
+            driver_color = f"#{team_color}"
+
+        # El segundo piloto del mismo equipo recibe el color aclarado
+        team_name = str(info["TeamName"])
+        if team_name in seen_teams:
+            driver_color = _lighten_color(driver_color)
+        else:
+            seen_teams.add(team_name)
+
+        drivers.append(
+            DriverDTO(
+                driver_number=str(info["DriverNumber"]),
+                abbreviation=str(info["Abbreviation"]),
+                full_name=str(info["FullName"]),
+                team_name=team_name,
+                team_color=f"#{team_color}",
+                driver_color=driver_color,
+            )
+        )
+
+    compounds: dict[str, str] = {}
+    for compound in COMPOUNDS:
+        try:
+            compounds[compound] = fastf1.plotting.get_compound_color(compound, session)
+        except Exception:
+            compounds[compound] = "#888888"
+
+    return DriversResponseDTO(
+        drivers=sorted(drivers, key=lambda d: d.abbreviation),
+        compounds=compounds,
+    )
 
 
 # Función auxiliar para convertir Timedelta a formato "Minutos:Segundos.Milisegundos"
