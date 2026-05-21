@@ -109,11 +109,8 @@ export default function LapDataGrid({ filters }) {
                     className="w-full flex items-center justify-between px-5 py-3 hover:bg-white/5 transition-colors"
                 >
                     <div>
-                        <h3 className="text-red-600 font-black italic uppercase tracking-widest text-xl leading-none">
-                            {filters
-                                ? `${filters.round} · ${filters.session} · ${filters.year}`
-                                : 'Data Display Legend'
-                            }
+                        <h3 className="text-gray-300 font-bold uppercase tracking-widest text-s">
+                            Data Display Legend
                         </h3>
                     </div>
                     <span className="text-gray-500 font-black text-sm tracking-widest transition-transform duration-200"

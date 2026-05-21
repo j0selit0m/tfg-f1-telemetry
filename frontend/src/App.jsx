@@ -6,8 +6,7 @@ import SidebarFilter from './components/SidebarFilter';
 import LapDataGrid from './components/LapDataGrid';
 import SummaryStatistics from './components/SummaryStatistics';
 import StintAnalysis from './components/StintAnalysis';
-import TelemetryView  from './components/TelemetryView';
-
+import TelemetryView from './components/TelemetryView';
 
 // Registro declarativo de pestañas. Para añadir una vista nueva basta con importar
 // el componente y añadir un objeto aquí; el render y la barra de tabs se actualizan solos.
@@ -15,64 +14,39 @@ const TABS = [
   { id: 'lap-data', label: 'Lap Data', component: LapDataGrid },
   { id: 'session-summary', label: 'Session Summary', component: SummaryStatistics },
   { id: 'stint-analysis', label: 'Stint Analysis', component: StintAnalysis },
-  { id: 'speed-telemetry', label: 'Speed Telemetry', component: TelemetryView  },
+  { id: 'speed-telemetry', label: 'Speed Telemetry', component: TelemetryView },
 ];
 
+// ─── Componente principal ─────────────────────────────────────────────────────
 
-function App() {
-  // null mientras el usuario no haya confirmado una sesión desde el Sidebar.
-  // Cada componente hijo es responsable de mostrar su propio estado vacío.
+export default function App() {
   const [activeFilters, setActiveFilters] = useState(null);
   const [activeTab, setActiveTab] = useState(TABS[0].id);
 
-  // Callback que recibe SidebarFilter al validar y confirmar la selección de sesión.
-  const handleFilterReady = (filters) => {
-    setActiveFilters(filters);
-  };
+  // Lazy mount: solo se montan las pestañas que el usuario ha visitado al menos una vez.
+  // Evita 4 fetches en paralelo al pulsar Run Analysis y mantiene en memoria las ya visitadas
+  // para que el cambio entre tabs sea instantáneo a partir de la segunda visita.
+  const [visitedTabs, setVisitedTabs] = useState(new Set([TABS[0].id]));
 
-  const ActiveComponent = TABS.find((tab) => tab.id === activeTab)?.component;
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    setVisitedTabs(prev => new Set(prev).add(tabId));
+  };
 
   return (
     <div className="flex h-screen bg-black text-white font-sans overflow-hidden">
 
-      {/* Sidebar: selección de temporada, GP, sesión y pilotos */}
-      <SidebarFilter onFilterReady={handleFilterReady} />
+      <SidebarFilter onFilterReady={setActiveFilters} />
 
       <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
+        <Header filters={activeFilters} />
+        <TabNav tabs={TABS} activeTab={activeTab} onChange={handleTabChange} />
 
-        <header className="flex items-center gap-3 px-6 py-3 bg-[#111318] border-b border-gray-800 flex-shrink-0">
-          <span className="text-sm font-black italic uppercase tracking-tight text-white">
-            Pit<span className="text-red-600">wall</span>
-          </span>
-          <span className="text-gray-700 text-xs">·</span>
-          <span className="text-xs text-gray-500 uppercase tracking-widest">
-            Formula 1 Data Analysis
-          </span>
-        </header>
-
-        {/* Navegación por pestañas generada a partir del array TABS */}
-        <nav className="flex bg-[#111318] border-b border-gray-800 flex-shrink-0">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              aria-selected={activeTab === tab.id}
-              className={[
-                'px-5 py-3 text-xs font-semibold uppercase tracking-widest',
-                'transition-colors duration-150 border-b-2 -mb-px cursor-pointer',
-                activeTab === tab.id
-                  ? 'text-white border-red-600'
-                  : 'text-gray-500 border-transparent hover:text-gray-300 hover:border-gray-600',
-              ].join(' ')}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-
-        {/* El scroll vive aquí para mantener sidebar y tabs siempre visibles */}
+        {/* Las pestañas no visitadas no se montan; las visitadas permanecen
+                    montadas y se ocultan con display:none cuando no son la activa. */}
         <main className="flex-1 overflow-y-auto">
           {TABS.map(tab => {
+            if (!visitedTabs.has(tab.id)) return null;
             const TabComponent = tab.component;
             return (
               <div
@@ -84,10 +58,62 @@ function App() {
             );
           })}
         </main>
-
       </div>
     </div>
   );
 }
 
-export default App;
+// ─── Sub-componentes ──────────────────────────────────────────────────────────
+
+// Header del área de contenido. Muestra el contexto de la sesión activa cuando hay
+// filtros aplicados; en caso contrario, una tagline neutra.
+function Header({ filters }) {
+  return (
+    <header className="flex items-center gap-3 px-6 py-3 bg-[#111318] border-b border-gray-800 flex-shrink-0">
+      {filters ? (
+        <>
+          <span className="text-base font-black italic uppercase tracking-tight text-white">
+            {filters.round}
+          </span>
+          <span className="text-red-600 font-black text-sm">·</span>
+          <span className="text-base font-black italic uppercase tracking-tight text-gray-300">
+            {filters.session}
+          </span>
+          <span className="text-red-600 font-black text-sm">·</span>
+          <span className="text-sm font-mono font-bold text-gray-500 tabular-nums">
+            {filters.year}
+          </span>
+        </>
+      ) : (
+        <span className="text-sm text-gray-500 uppercase tracking-widest">
+          Formula 1 Data Analysis
+        </span>
+      )}
+    </header>
+  );
+}
+
+// Barra de navegación por pestañas. Recibe el array de tabs, el id activo y un
+// callback de cambio. Cada tab es un botón con su propio estado visual.
+function TabNav({ tabs, activeTab, onChange }) {
+  return (
+    <nav className="flex bg-[#111318] border-b border-gray-800 flex-shrink-0">
+      {tabs.map(tab => (
+        <button
+          key={tab.id}
+          onClick={() => onChange(tab.id)}
+          aria-selected={activeTab === tab.id}
+          className={[
+            'px-5 py-3 text-xs font-semibold uppercase tracking-widest',
+            'transition-colors duration-150 border-b-2 -mb-px cursor-pointer',
+            activeTab === tab.id
+              ? 'text-white border-red-600'
+              : 'text-gray-500 border-transparent hover:text-gray-300 hover:border-gray-600',
+          ].join(' ')}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </nav>
+  );
+}
