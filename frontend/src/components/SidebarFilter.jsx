@@ -28,6 +28,7 @@ function useF1SessionData() {
     const [events, setEvents] = useState([]);
     const [sessions, setSessions] = useState([]);
     const [drivers, setDrivers] = useState([]);
+    const [compounds, setCompounds] = useState({});
 
     // Selecciones actuales del usuario
     const [selectedYear, setSelectedYear] = useState('');
@@ -74,7 +75,10 @@ function useF1SessionData() {
         setDrivers([]);
         setLoadingDrivers(true);
         apiFetch(`${API_BASE}/session/${selectedYear}/${selectedEvent}/${selectedSession}/drivers`)
-            .then(data => setDrivers(data.drivers ?? []))
+            .then(data => {
+                setDrivers(data.drivers ?? []);
+                setCompounds(data.compounds ?? {});
+            })
             .catch(err => console.error('Drivers fetch failed:', err))
             .finally(() => setLoadingDrivers(false));
     }, [selectedSession, selectedEvent, selectedYear]);
@@ -99,6 +103,7 @@ function useF1SessionData() {
             availableSessions: sessions.map(s => s.id),
             driverColors: Object.fromEntries(selected.map(d => [d.abbreviation, d.driver_color])),
             teamColors: Object.fromEntries(selected.map(d => [d.abbreviation, d.team_color])),
+            compounds,
         };
     };
 

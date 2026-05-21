@@ -1,11 +1,12 @@
 """
-TFG Formula 1 API — Tracing Insights
+TFG Formula 1 API
 Backend de análisis de telemetría F1 con FastAPI + FastF1.
 """
 
 import asyncio
 import os
 import fastf1
+import fastf1.plotting
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Path, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -277,7 +278,8 @@ async def get_drivers(
     for compound in COMPOUNDS:
         try:
             compounds[compound] = fastf1.plotting.get_compound_color(compound, session)
-        except Exception:
+        except Exception as e:
+            print(f"[DEBUG get_drivers] compound='{compound}' error='{e}'")
             compounds[compound] = "#888888"
 
     return DriversResponseDTO(

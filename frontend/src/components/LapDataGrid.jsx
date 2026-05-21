@@ -5,16 +5,11 @@ const API_BASE = 'http://localhost:8000/api';
 // ─── Helpers visuales ─────────────────────────────────────────────────────────
 
 // Devuelve la letra y las clases CSS de color para cada compuesto de neumático
-const getCompoundInfo = (compound) => {
-    const compMap = {
-        SOFT: { letter: 'S', colorClass: 'border-red-600 text-red-500' },
-        MEDIUM: { letter: 'M', colorClass: 'border-yellow-400 text-yellow-400' },
-        HARD: { letter: 'H', colorClass: 'border-gray-200 text-gray-200' },
-        INTERMEDIATE: { letter: 'I', colorClass: 'border-green-500 text-green-500' },
-        WET: { letter: 'W', colorClass: 'border-blue-600 text-blue-500' },
-        UNKNOWN: { letter: 'X', colorClass: 'border-purple-500 text-purple-500' },
-    };
-    return compMap[compound?.toUpperCase()] ?? compMap.UNKNOWN;
+const getCompoundInfo = (compound, compounds) => {
+    const letters = { SOFT: 'S', MEDIUM: 'M', HARD: 'H', INTERMEDIATE: 'I', WET: 'W' };
+    const key = compound?.toUpperCase() ?? 'UNKNOWN';
+    const color = compounds?.[key] ?? '#FFFFFF';
+    return { letter: letters[key] ?? 'X', color };
 };
 
 // Renderiza LEDs de colores para cada código de estado de pista.
@@ -137,23 +132,29 @@ export default function LapDataGrid({ filters }) {
                             <span className="block text-sm font-bold text-gray-500 uppercase tracking-widest mb-2">Tire Compounds</span>
                             <div className="flex flex-wrap gap-3">
                                 {[
-                                    { letter: 'S', border: 'border-red-600', text: 'text-red-500', label: 'Soft' },
-                                    { letter: 'M', border: 'border-yellow-400', text: 'text-yellow-400', label: 'Medium' },
-                                    { letter: 'H', border: 'border-gray-200', text: 'text-gray-200', label: 'Hard' },
-                                    { letter: 'I', border: 'border-green-500', text: 'text-green-500', label: 'Inter' },
-                                    { letter: 'W', border: 'border-blue-600', text: 'text-blue-500', label: 'Wet' },
-                                ].map(({ letter, border, text, label }) => (
-                                    <span key={label} className="flex items-center text-sm font-bold text-gray-300">
-                                        <div className={`w-5 h-5 flex items-center justify-center rounded-full border-[3px] ${border} bg-[#1a1a1a] mr-1.5`}>
-                                            <span className={`font-black text-[9px] ${text}`}>{letter}</span>
-                                        </div>
-                                        {label}
-                                    </span>
-                                ))}
+                                    { key: 'SOFT', letter: 'S', label: 'Soft' },
+                                    { key: 'MEDIUM', letter: 'M', label: 'Medium' },
+                                    { key: 'HARD', letter: 'H', label: 'Hard' },
+                                    { key: 'INTERMEDIATE', letter: 'I', label: 'Inter' },
+                                    { key: 'WET', letter: 'W', label: 'Wet' },
+                                ].map(({ key, letter, label }) => {
+                                    const color = filters?.compounds?.[key] ?? '#FFFFFF';
+                                    return (
+                                        <span key={label} className="flex items-center text-sm font-bold text-gray-300">
+                                            <div
+                                                className="w-6 h-6 flex items-center justify-center rounded-full border-[3px] bg-[#1a1a1a] mr-1.5"
+                                                style={{ borderColor: color, color }}
+                                            >
+                                                <span className="font-black text-[9px]">{letter}</span>
+                                            </div>
+                                            {label}
+                                        </span>
+                                    );
+                                })}
                             </div>
                             <div className="flex gap-6 mt-2">
                                 <span className="flex items-center text-sm font-mono text-gray-300">
-                                    <span className="px-2 py-0.5 bg-gray-800 text-white font-bold rounded-sm mr-2 border border-gray-600">S1</span> Stint Num
+                                    <span className="px-2 py-0.5 bg-gray-800 text-white font-bold rounded-sm mr-2 border border-gray-600">ST1</span> Stint Num
                                 </span>
                                 <span className="flex items-center text-sm font-mono text-gray-300">
                                     <span className="px-2 py-0.5 bg-gray-800 text-red-400 font-bold rounded-sm mr-2 border border-gray-600">L12</span> Tire Age
@@ -293,7 +294,7 @@ export default function LapDataGrid({ filters }) {
                                             }
                                         }
 
-                                        const compInfo = getCompoundInfo(data.compound);
+                                        const compInfo = getCompoundInfo(data.compound, filters?.compounds);
                                         // Solo marcamos la vuelta más rápida si la vuelta no fue eliminada por los comisarios
                                         const isFastestLap = data.is_fastest_lap && !data.deleted;
 
@@ -356,15 +357,18 @@ export default function LapDataGrid({ filters }) {
 
                                                         <div className="flex items-center gap-2 bg-gray-900 border border-gray-700 rounded p-1">
                                                             <span className="text-xs px-1.5 font-bold text-gray-400">
-                                                                S{data.stint}
+                                                                ST{data.stint}
                                                             </span>
                                                             <span className="text-xs px-1.5 font-bold border-l border-r border-gray-700 text-gray-200">                                                                L{data.tyre_life}
                                                             </span>
                                                             <div
-                                                                className={`w-6 h-6 flex items-center justify-center rounded-full border-[3px] bg-[#1a1a1a] shadow-inner ${compInfo.colorClass}`}
+                                                                className="w-6 h-6 flex items-center justify-center rounded-full border-[3px] bg-[#1a1a1a] shadow-inner"
+                                                                style={{ borderColor: compInfo.color, color: compInfo.color }}
                                                                 title={`Compound: ${data.compound} · Age: ${data.tyre_life} laps`}
                                                             >
-                                                                <span className="font-black text-[10px] leading-none">{compInfo.letter}</span>
+                                                                <span className="font-black text-[10px] leading-none translate-y-px">
+                                                                    {compInfo.letter}
+                                                                </span>
                                                             </div>
                                                         </div>
                                                     </div>
