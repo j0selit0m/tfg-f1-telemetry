@@ -689,142 +689,202 @@ async def get_summary_stats(
     return SummaryResponseDTO(drivers=driver_list, summaries=summaries)
 
 
-@app.get("/api/analysis/{year}/{event_name}/{session_name}/stints")
+"""
+Módulo de análisis de stints por piloto.
+ 
+Devuelve métricas estadísticas por stint (duración, mejor vuelta, media,
+mediana, desviación estándar y consistencia) para los pilotos seleccionados.
+La respuesta es simétrica: si un piloto no tiene datos para un stint concreto,
+su valor es null en lugar de omitirse.
+"""
+
+# ── DTOs ──────────────────────────────────────────────────────────────────────
+ 
+class StintBestLapDTO(BaseModel):
+    time:         str | None = Field(None, description="Tiempo en formato M:SS.mmm")
+    lap_in_stint: int | None = Field(None, description="Posición de la vuelta dentro del stint")
+ 
+ 
+class StintDriverDTO(BaseModel):
+    """Métricas de un piloto para un stint concreto."""
+    compound:       str            = Field(..., description="SOFT, MEDIUM, HARD, INTERMEDIATE, WET")
+    compound_color: str            = Field(..., description="Color HEX oficial F1 de esa temporada")
+    compound_label: str            = Field(..., description="Letra corta: S, M, H, I, W")
+    duration_laps:  int            = Field(..., description="Total de vueltas del stint")
+    duration_time:  str | None     = Field(None, description="Tiempo total del stint en M:SS.mmm")
+    best_lap:       StintBestLapDTO | None = Field(None, description="Mejor vuelta del stint")
+    average:        str | None     = Field(None, description="Media de tiempos válidos en M:SS.mmm")
+    median:         str | None     = Field(None, description="Mediana de tiempos válidos en M:SS.mmm")
+    std_dev:        str | None     = Field(None, description="Desviación estándar en SS.mmm")
+    consistency:    float | None   = Field(None, description="(1 - std/mean) * 100")
+ 
+ 
+class StintEntryDTO(BaseModel):
+    """Un stint con los datos de todos los pilotos seleccionados."""
+    stint_number: int
+    drivers: dict[str, StintDriverDTO | None] = Field(
+        ...,
+        description="Mapa abbreviation → StintDriverDTO. None si el piloto no tiene ese stint.",
+    )
+ 
+ 
+class StintsResponseDTO(BaseModel):
+    """Estructura consistente con el resto de endpoints de análisis."""
+    drivers: list[str]          = Field(..., description="Pilotos en el orden del request")
+    stints:  list[StintEntryDTO]
+ 
+ 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+ 
+def _format_timedelta(td) -> str | None:
+    """Convierte un Timedelta de Pandas a string legible M:SS.mmm o SS.mmm."""
+    if pd.isna(td):
+        return None
+    total_seconds = td.total_seconds()
+    minutes      = int(total_seconds // 60)
+    seconds      = int(total_seconds % 60)
+    milliseconds = int((total_seconds * 1000) % 1000)
+    if minutes > 0:
+        return f"{minutes}:{seconds:02d}.{milliseconds:03d}"
+    return f"{seconds}.{milliseconds:03d}"
+ 
+ 
+def _get_compound_color(compound: str, session: fastf1.core.Session) -> str:
+    """Obtiene el color oficial del compuesto con fallback a colores hardcodeados."""
+    _FALLBACK: dict[str, str] = {
+        "SOFT":         "#da291c",
+        "MEDIUM":       "#ffd600",
+        "HARD":         "#f0f0ec",
+        "INTERMEDIATE": "#39b54a",
+        "WET":          "#0067ff",
+    }
+    try:
+        return fastf1.plotting.get_compound_color(compound, session)
+    except Exception:
+        return _FALLBACK.get(compound, "#888888")
+ 
+ 
+def _build_stint_driver(
+    stint_laps_all: pd.DataFrame,
+    compound:       str,
+    session:        fastf1.core.Session,
+) -> StintDriverDTO:
+    """Calcula las métricas de un piloto para un stint concreto.
+ 
+    Las pit in/out NO se excluyen con pick_wo_box() porque stint_laps_all
+    ya está filtrado por stint — las vueltas de transición pertenecen a
+    stints distintos. Sí se excluyen vueltas borradas y sin tiempo registrado.
+    """
+    valid_times      = stint_laps_all["LapTime"].dropna()
+    total_duration   = valid_times.sum() if not valid_times.empty else None
+ 
+    laps_for_stats = stint_laps_all[
+        stint_laps_all["LapTime"].notna() & ~stint_laps_all["Deleted"].fillna(False)
+    ]
+ 
+    base = dict(
+        compound=       compound,
+        compound_color= _get_compound_color(compound, session),
+        compound_label= _COMPOUND_LABELS.get(compound, "?"),
+        duration_laps=  int(len(stint_laps_all)),
+        duration_time=  _format_timedelta(total_duration),
+    )
+ 
+    if laps_for_stats.empty:
+        return StintDriverDTO(**base, best_lap=None, average=None, median=None, std_dev=None, consistency=None)
+ 
+    lap_times_s = laps_for_stats["LapTime"].dt.total_seconds()
+    mean_s      = lap_times_s.mean()
+    median_s    = lap_times_s.median()
+    std_s       = lap_times_s.std()  # ddof=1 (estimación muestral)
+ 
+    best_lap    = laps_for_stats.pick_fastest(only_by_time=True)
+ 
+    # Posición relativa de la mejor vuelta dentro del stint.
+    # Se usa stint_laps_all como referencia para que "Lap 6" signifique
+    # la 6ª vuelta del stint aunque alguna haya sido filtrada de las stats.
+    lap_in_stint = int(
+        (stint_laps_all["LapNumber"] <= int(best_lap["LapNumber"])).sum()
+    ) if pd.notna(best_lap["LapNumber"]) else None
+ 
+    consistency = (
+        round((1 - std_s / mean_s) * 100, 1)
+        if mean_s > 0 and pd.notna(std_s)
+        else None
+    )
+ 
+    return StintDriverDTO(
+        **base,
+        best_lap=StintBestLapDTO(
+            time=         _format_timedelta(best_lap["LapTime"]),
+            lap_in_stint= lap_in_stint,
+        ),
+        average=     _format_timedelta(pd.to_timedelta(mean_s,   unit="s")),
+        median=      _format_timedelta(pd.to_timedelta(median_s, unit="s")),
+        std_dev=     _format_timedelta(pd.to_timedelta(std_s,    unit="s")),
+        consistency= float(consistency) if consistency is not None else None,
+    )
+ 
+ 
+# ── Endpoint ──────────────────────────────────────────────────────────────────
+ 
+@app.get(
+    "/api/analysis/{year}/{event_name}/{session_name}/stints",
+    response_model=StintsResponseDTO,
+    tags=["Análisis"],
+    summary="Métricas estadísticas por stint",
+)
 async def get_stint_analysis(
-    year: int, event_name: str, session_name: str, drivers: str
-):
+    year:         int = Path(..., ge=MIN_YEAR, le=MAX_YEAR, description="Temporada F1"),
+    event_name:   str = Path(..., min_length=2,             description="Nombre del Gran Premio"),
+    session_name: str = Path(...,                           description="Tipo de sesión: Race, Qualifying..."),
+    drivers:      str = Query(
+        ...,
+        description="Abreviaturas de pilotos separadas por coma",
+        example="ALO,SAI",
+    ),
+) -> StintsResponseDTO:
     """
     Devuelve las métricas estadísticas de cada stint para los pilotos seleccionados.
-
-    **Métricas por stint:** `duration`, `best_lap`, `average`, `median`, `std_dev`, `consistency`
-
-    - Las vueltas de pit in/out se excluyen de las estadísticas pero sí cuentan en la duración.
-    - Si un piloto no tiene datos para un stint (estrategias distintas), su valor es `null`.
+ 
+    La respuesta es simétrica: si el piloto A tiene 4 stints y el B tiene 3,
+    el stint 4 aparece con datos del piloto A y null en el piloto B.
     """
     try:
-        session = fastf1.get_session(year, event_name, session_name)
-        session.load(telemetry=False, weather=False, messages=False)
-
-        driver_list = [d.strip().upper() for d in drivers.split(",")]
-        all_laps = session.laps.pick_drivers(driver_list)
-
-        # Recogemos los stints de todos los pilotos para una respuesta simétrica:
-        # si el piloto A tiene 4 stints y el B tiene 3, el stint 4 aparece con
-        # datos del piloto A y null en el piloto B.
-        all_stint_numbers = sorted(
-            int(s) for s in all_laps.dropna(subset=["Stint"])["Stint"].unique()
-        )
-
-        response_stints = []
-
-        for stint_num in all_stint_numbers:
-            stint_entry = {"stint_number": stint_num, "drivers": {}}
-
-            for driver_abbr in driver_list:
-                driver_laps = all_laps[all_laps["Driver"] == driver_abbr]
-
-                # Aislamos el stint actual ordenado por vuelta.
-                # reset_index() reindexia desde 0 para que iloc funcione
-                # correctamente tras el filtrado y el sort.
-                stint_laps_all = (
-                    driver_laps[driver_laps["Stint"] == stint_num]
-                    .copy()
-                    .sort_values("LapNumber")
-                    .reset_index(drop=True)
-                )
-
-                if stint_laps_all.empty:
-                    stint_entry["drivers"][driver_abbr] = None
-                    continue
-
-                # Tomamos el compuesto de la primera vuelta del stint, más fiable
-                # que el modo estadístico en vueltas de transición o cambio de box.
-                compound_raw = str(stint_laps_all["Compound"].iloc[0]).upper()
-                compound_info = COMPOUND_COLORS.get(
-                    compound_raw, {"bg": "#888888", "label": "?"}
-                )
-
-                # DURACIÓN: sumamos todas las vueltas con tiempo válido del stint,
-                # incluida la pit in. Comprobamos .empty antes porque pd.Timedelta(0)
-                # es falsy y "sum() or None" daría None incorrectamente.
-                valid_times = stint_laps_all["LapTime"].dropna()
-                total_duration_td = valid_times.sum() if not valid_times.empty else None
-
-                # ESTADÍSTICAS: excluimos vueltas borradas por comisarios y sin tiempo.
-                # Las vueltas de VSC/SC se mantienen: son representativas del ritmo del coche.
-                # pick_wo_box() no se usa aquí porque stint_laps_all ya está filtrado
-                # por stint y las pit in/out pertenecen a stints de transición.
-                laps_for_stats = stint_laps_all[
-                    ~stint_laps_all["Deleted"].fillna(False)
-                ]
-                laps_for_stats = laps_for_stats[laps_for_stats["LapTime"].notna()]
-
-                if laps_for_stats.empty:
-                    stint_entry["drivers"][driver_abbr] = {
-                        "compound": compound_raw,
-                        "compound_color": compound_info["bg"],
-                        "compound_label": compound_info["label"],
-                        "duration_laps": int(len(stint_laps_all)),
-                        "duration_time": format_timedelta(total_duration_td),
-                        "best_lap": None,
-                        "average": None,
-                        "median": None,
-                        "std_dev": None,
-                        "consistency": None,
-                    }
-                    continue
-
-                # Convertimos LapTime a segundos float para operar con pandas/numpy.
-                lap_times_s = laps_for_stats["LapTime"].dt.total_seconds()
-
-                # pick_fastest(only_by_time=True) ignora IsPersonalBest y busca
-                # el mínimo puro sobre el conjunto ya filtrado.
-                best_lap = laps_for_stats.pick_fastest(only_by_time=True)
-
-                # Posición relativa de la mejor vuelta dentro del stint.
-                # Usamos stint_laps_all como referencia para que "Lap 6" signifique
-                # la 6ª vuelta del stint aunque alguna haya sido filtrada de las stats.
-                lap_in_stint = int(
-                    (stint_laps_all["LapNumber"] <= int(best_lap["LapNumber"])).sum()
-                )
-
-                mean_s, median_s, std_s = (
-                    lap_times_s.mean(),
-                    lap_times_s.median(),
-                    lap_times_s.std(),  # ddof=1 por defecto (estimación muestral)
-                )
-
-                # std_dev se serializa como "X.XXXs" porque la desviación de un stint
-                # siempre es de segundos y el formato M:SS.mmm sería ilegible aquí.
-                consistency = (
-                    round((1 - std_s / mean_s) * 100, 1)
-                    if mean_s > 0 and pd.notna(std_s)
-                    else None
-                )
-
-                # Casting explícito a tipos Python: los tipos Numpy (float64, int64)
-                # rompen el serializador JSON de FastAPI.
-                stint_entry["drivers"][driver_abbr] = {
-                    "compound": compound_raw,
-                    "compound_color": compound_info["bg"],
-                    "compound_label": compound_info["label"],
-                    "duration_laps": int(len(stint_laps_all)),
-                    "duration_time": format_timedelta(total_duration_td),
-                    "best_lap": {
-                        "time": format_timedelta(best_lap["LapTime"]),
-                        "lap_in_stint": lap_in_stint,
-                    },
-                    "average": format_timedelta(pd.to_timedelta(mean_s, unit="s")),
-                    "median": format_timedelta(pd.to_timedelta(median_s, unit="s")),
-                    "std_dev": f"{std_s:.3f}s" if pd.notna(std_s) else None,
-                    "consistency": float(consistency)
-                    if consistency is not None
-                    else None,
-                }
-
-            response_stints.append(stint_entry)
-
-        return response_stints
-
+        session = await _load_session(year, event_name, session_name)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=404, detail=f"Sesión no encontrada: {e}")
+ 
+    driver_list = [d.strip().upper() for d in drivers.split(",")]
+    all_laps    = session.laps.pick_drivers(driver_list)
+ 
+    all_stint_numbers = sorted(
+        int(s) for s in all_laps.dropna(subset=["Stint"])["Stint"].unique()
+    )
+ 
+    stints: list[StintEntryDTO] = []
+ 
+    for stint_num in all_stint_numbers:
+        drivers_data: dict[str, StintDriverDTO | None] = {}
+ 
+        for driver_abbr in driver_list:
+            stint_laps = (
+                all_laps[
+                    (all_laps["Driver"] == driver_abbr) &
+                    (all_laps["Stint"]  == stint_num)
+                ]
+                .copy()
+                .sort_values("LapNumber")
+                .reset_index(drop=True)
+            )
+ 
+            if stint_laps.empty:
+                drivers_data[driver_abbr] = None
+                continue
+ 
+            compound = str(stint_laps["Compound"].iloc[0]).upper()
+            drivers_data[driver_abbr] = _build_stint_driver(stint_laps, compound, session)
+ 
+        stints.append(StintEntryDTO(stint_number=stint_num, drivers=drivers_data))
+ 
+    return StintsResponseDTO(drivers=driver_list, stints=stints)
