@@ -289,13 +289,6 @@ export default function SessionSummary({ filters }) {
                         {filters.round} · {filters.session} · Season {filters.year}
                     </p>
                 </div>
-                <button
-                    onClick={refetch}
-                    disabled={isLoading}
-                    className="border border-gray-700 text-gray-500 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest hover:border-gray-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0"
-                >
-                    {isLoading ? '···' : '↻ RELOAD'}
-                </button>
             </div>
 
             {/* Banner de error */}
