@@ -491,166 +491,202 @@ async def get_lap_data(
     return LapsResponseDTO(drivers=driver_list, laps=lap_rows)
 
 
-# =====================================================
-# MAPA DE COMPUESTOS (colores y etiquetas oficiales F1)
-# =====================================================
-# Dict estático de fallback. Los colores están hardcodeados según la paleta
-# oficial de Pirelli. En producción, sustituir por fastf1.plotting.get_compound_color()
-# para obtener el color exacto por temporada de forma dinámica.
-COMPOUND_COLORS = {
-    "SOFT": {"bg": "#E8002D", "label": "S"},
-    "MEDIUM": {"bg": "#FFC906", "label": "M"},
-    "HARD": {"bg": "#FFFFFF", "label": "H"},
-    "INTER": {"bg": "#43B02A", "label": "I"},
-    "WET": {"bg": "#0067FF", "label": "W"},
+"""
+Módulo de estadísticas resumen por piloto.
+
+Calcula métricas agregadas de rendimiento (mejor vuelta, media, mediana,
+consistencia, vueltas válidas y estrategia de neumáticos) para una sesión
+y un conjunto de pilotos seleccionados.
+"""
+
+# Etiquetas cortas de compuestos. FastF1 expone los colores pero no las letras,
+# por eso este mapa pequeño se mantiene local.
+_COMPOUND_LABELS: dict[str, str] = {
+    "SOFT": "S",
+    "MEDIUM": "M",
+    "HARD": "H",
+    "INTERMEDIATE": "I",
+    "WET": "W",
 }
 
 
-# =====================================================
-# ENDPOINT: Summary Statistics
-# =====================================================
-@app.get("/api/analysis/{year}/{event_name}/{session_name}/summary")
-async def get_summary_stats(
-    year: int, event_name: str, session_name: str, drivers: str
-):
+# ── DTOs ──────────────────────────────────────────────────────────────────────
+
+
+class BestLapDTO(BaseModel):
+    time: str | None = Field(None, description="Tiempo en formato M:SS.mmm")
+    lap_number: int | None = Field(None, description="Número de la vuelta más rápida")
+
+
+class StintCompoundDTO(BaseModel):
+    """Compuesto usado en un stint, listo para renderizar como pill/chip."""
+
+    compound: str = Field(..., description="SOFT, MEDIUM, HARD, INTERMEDIATE, WET")
+    color: str = Field(..., description="Color HEX oficial F1 (dinámico por temporada)")
+    label: str = Field(..., description="Letra corta: S, M, H, I, W")
+
+
+class DriverSummaryDTO(BaseModel):
+    """Estadísticas resumen de un piloto en una sesión."""
+
+    best_lap: BestLapDTO
+    average: str | None = Field(None, description="Media de tiempos válidos, M:SS.mmm")
+    median: str | None = Field(None, description="Mediana de tiempos válidos, M:SS.mmm")
+    std_dev: str | None = Field(None, description="Desviación estándar, SS.mmm")
+    consistency: float = Field(
+        ..., description="(1 - std/mean) * 100. 100 = vueltas idénticas"
+    )
+    valid_laps: int = Field(
+        ..., description="Vueltas completadas no borradas (incluye VSC/SC)"
+    )
+    strategy: list[StintCompoundDTO] = Field(
+        ..., description="Secuencia de compuestos por stint en orden"
+    )
+
+
+class SummaryResponseDTO(BaseModel):
+    """Estructura coherente con el endpoint de vueltas: drivers + mapa de summaries."""
+
+    drivers: list[str] = Field(..., description="Pilotos en el orden del request")
+    summaries: dict[str, DriverSummaryDTO | None] = Field(
+        ...,
+        description="Mapa abbreviation → DriverSummaryDTO. None si el piloto no tiene datos válidos.",
+    )
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+
+def _build_strategy(
+    driver_laps: pd.DataFrame, session: fastf1.core.Session
+) -> list[StintCompoundDTO]:
+    """Construye la secuencia de compuestos por stint con colores oficiales FastF1.
+
+    Toma el compuesto de la primera vuelta del stint en vez del modo estadístico:
+    FastF1 puede registrar un compuesto distinto en vueltas de transición y la
+    primera vuelta es siempre la fuente de verdad.
     """
-    Calcula y devuelve el cuadro de resumen estadístico por piloto.
+    strategy: list[StintCompoundDTO] = []
+    stint_groups = driver_laps.dropna(subset=["Stint", "Compound"]).groupby(
+        "Stint", sort=True
+    )
 
-    Métricas devueltas por piloto:
-      - best_lap:    Vuelta más rápida real con su número de vuelta
-      - average:     Media de tiempos sobre vueltas válidas
-      - median:      Mediana de tiempos sobre vueltas válidas
-      - std_dev:     Desviación estándar (indicador de consistencia bruta)
-      - consistency: Índice porcentual -> (1 - std/mean) * 100
-      - valid_laps:  Total de vueltas completadas sin borrar (incluye VSC/SC)
-      - strategy:    Secuencia de compuestos usados en orden de stint
+    for _, stint_laps in stint_groups:
+        compound = str(stint_laps["Compound"].iloc[0]).upper()
+        try:
+            color = fastf1.plotting.get_compound_color(compound, session)
+        except Exception:
+            color = "#888888"
+        strategy.append(
+            StintCompoundDTO(
+                compound=compound,
+                color=color,
+                label=_COMPOUND_LABELS.get(compound, "?"),
+            )
+        )
+    return strategy
 
-    Query Params:
-      - drivers: Abreviaturas separadas por coma (ej: "ALO,VER")
+
+def _build_driver_summary(
+    driver_laps: pd.DataFrame, session: fastf1.core.Session
+) -> DriverSummaryDTO | None:
+    """Calcula todas las estadísticas para un piloto. None si no hay datos válidos.
+
+    Aplica dos filtros distintos según el caso:
+      - Conteo de vueltas: incluye VSC/SC/pit (criterio Tracing Insights).
+        Solo se descartan vueltas sin tiempo o borradas por los comisarios.
+      - Estadísticas: además excluye pit in/out con pick_wo_box(), ya que
+        incluyen ~20-30s del pit stop y distorsionarían todas las métricas.
+        Se mantienen las vueltas bajo VSC/SC porque siguen siendo
+        representativas del comportamiento del coche.
+    """
+    if driver_laps.empty:
+        return None
+
+    valid_for_count = driver_laps[
+        driver_laps["LapTime"].notna() & ~driver_laps["Deleted"].fillna(False)
+    ]
+
+    laps_for_stats = driver_laps.pick_wo_box()
+    laps_for_stats = laps_for_stats[
+        laps_for_stats["LapTime"].notna() & ~laps_for_stats["Deleted"].fillna(False)
+    ]
+
+    if laps_for_stats.empty:
+        return None
+
+    lap_times_s = laps_for_stats["LapTime"].dt.total_seconds()
+    mean_s = lap_times_s.mean()
+    median_s = lap_times_s.median()
+    std_s = lap_times_s.std()  # ddof=1 por defecto (estimación muestral)
+
+    # only_by_time=True ignora IsPersonalBest y busca el mínimo puro,
+    # evitando que una vuelta marcada como PB pero luego borrada interfiera.
+    best_lap = laps_for_stats.pick_fastest(only_by_time=True)
+    if best_lap is None:
+        return None
+
+    consistency = round((1 - std_s / mean_s) * 100, 2) if mean_s > 0 else 0.0
+
+    return DriverSummaryDTO(
+        best_lap=BestLapDTO(
+            time=_format_timedelta(best_lap["LapTime"]),
+            lap_number=int(best_lap["LapNumber"])
+            if pd.notna(best_lap["LapNumber"])
+            else None,
+        ),
+        average=_format_timedelta(pd.to_timedelta(mean_s, unit="s")),
+        median=_format_timedelta(pd.to_timedelta(median_s, unit="s")),
+        std_dev=_format_timedelta(pd.to_timedelta(std_s, unit="s")),
+        consistency=float(consistency),
+        valid_laps=int(len(valid_for_count)),
+        strategy=_build_strategy(driver_laps, session),
+    )
+
+
+# ── Endpoint ──────────────────────────────────────────────────────────────────
+
+
+@app.get(
+    "/api/analysis/{year}/{event_name}/{session_name}/summary",
+    response_model=SummaryResponseDTO,
+    tags=["Análisis"],
+    summary="Estadísticas resumen por piloto",
+)
+async def get_summary_stats(
+    year: int = Path(..., ge=MIN_YEAR, le=MAX_YEAR, description="Temporada F1"),
+    event_name: str = Path(..., min_length=2, description="Nombre del Gran Premio"),
+    session_name: str = Path(..., description="Tipo de sesión: Race, Qualifying..."),
+    drivers: str = Query(
+        ...,
+        description="Abreviaturas de pilotos separadas por coma",
+        example="ALO,SAI,VER",
+    ),
+) -> SummaryResponseDTO:
+    """
+    Devuelve estadísticas agregadas por piloto: mejor vuelta, media, mediana,
+    desviación estándar, índice de consistencia, vueltas válidas y estrategia
+    de neumáticos.
+
+    **Criterios de filtrado:**
+    - Conteo de vueltas: incluye VSC/SC/pit, excluye solo borradas y sin tiempo.
+    - Estadísticas: excluye pit in/out (distorsionan ~20-30s).
+    - Consistencia: (1 - std/mean) * 100. Cuanto más alto, vueltas más uniformes.
     """
     try:
-        session = fastf1.get_session(year, event_name, session_name)
-
-        session.load(telemetry=False, weather=False, messages=False)
-
-        # Normalizamos la entrada: strip() elimina espacios accidentales tras la coma
-        # (ej: "ALO, VER" -> ["ALO", "VER"]) y upper() garantiza el match con FastF1.
-        driver_list = [d.strip().upper() for d in drivers.split(",")]
-
-        # pick_drivers() acepta abreviaturas, dorsales o nombres completos indistintamente.
-        # Cargamos todos los pilotos de una vez para hacer un único acceso al DataFrame.
-        all_laps = session.laps.pick_drivers(driver_list)
-
-        response_data = {}
-
-        for driver_abbr in driver_list:
-            # Aislamos las vueltas del piloto actual del DataFrame combinado.
-            # .copy() evita el SettingWithCopyWarning de pandas al modificar el slice.
-            driver_laps = all_laps[all_laps["Driver"] == driver_abbr].copy()
-
-            if driver_laps.empty:
-                response_data[driver_abbr] = None
-                continue
-
-            # ---- CONTEO: válidas para el campo valid_laps ----
-            # Incluimos VSC, SC y pit in/out: Tracing Insights muestra 66 en una carrera
-            # de 66 vueltas, lo que confirma que no excluyen ningún tipo de vuelta del conteo.
-            # Solo descartamos las que no tienen tiempo registrado o fueron borradas
-            # por los comisarios (infracción de track limits, etc.).
-            laps_for_count = driver_laps[
-                driver_laps["LapTime"].notna() & ~driver_laps["Deleted"].fillna(False)
-            ]
-
-            # ---- ESTADÍSTICAS: válidas para average, median, std, consistency ----
-            # Excluimos pit in/out con pick_wo_box() porque esas vueltas incluyen
-            # el tiempo de pit stop (~20-30s extra) y distorsionan todas las métricas.
-            # A diferencia del conteo, aquí SÍ incluimos VSC/SC: aunque son
-            # artificialmente lentas por el reglamento, siguen siendo representativas
-            # del comportamiento del coche.
-            # pick_wo_box() se guarda en variable para no encadenar la llamada tres veces.
-            laps_for_stats = driver_laps.pick_wo_box()
-            laps_for_stats = laps_for_stats[
-                laps_for_stats["LapTime"].notna()
-                & ~laps_for_stats["Deleted"].fillna(False)
-            ]
-
-            if laps_for_stats.empty:
-                response_data[driver_abbr] = None
-                continue
-
-            # Convertimos la columna LapTime (Timedelta) a segundos float para
-            # poder operar con las funciones estadísticas estándar de pandas/numpy.
-            lap_times_s = laps_for_stats["LapTime"].dt.total_seconds()
-            mean_s = lap_times_s.mean()
-            median_s = lap_times_s.median()
-            std_s = lap_times_s.std()  # ddof=1 por defecto (estimación muestral)
-
-            # pick_fastest(only_by_time=True) opera sobre el conjunto ya filtrado.
-            # only_by_time=True ignora el flag IsPersonalBest y busca el mínimo puro,
-            # evitando que una vuelta marcada como PB pero luego borrada interfiera.
-            best_lap = laps_for_stats.pick_fastest(only_by_time=True)
-
-            if best_lap is None:
-                response_data[driver_abbr] = None
-                continue
-
-            # ---- CONSISTENCY ----
-            # Fórmula derivada del coeficiente de variación inverso.
-            # Un piloto con std=0 tendría 100% (vueltas idénticas).
-            consistency = round((1 - std_s / mean_s) * 100, 2) if mean_s > 0 else 0.0
-
-            # ---- STRATEGY: secuencia de compuestos por stint ----
-            # Usamos driver_laps completas (no laps_for_stats) para no perder
-            # las vueltas de pit que marcan el cambio de stint y compuesto.
-            # dropna() sobre Stint y Compound antes de agrupar previene que una vuelta
-            # con datos incompletos genere un stint fantasma en el groupby.
-            # El detalle analítico de cada stint (duración, media, mediana...)
-            # se sirve en el endpoint /stints, no aquí.
-            strategy = []
-            stint_groups = driver_laps.dropna(subset=["Stint", "Compound"]).groupby(
-                "Stint", sort=True
-            )
-
-            for _, stint_laps in stint_groups:
-                # Tomamos el compuesto de la primera vuelta del stint.
-                # Es más fiable que el modo estadístico porque FastF1 puede registrar
-                # un compuesto distinto en vueltas de transición.
-                compound_raw = str(stint_laps["Compound"].iloc[0]).upper()
-                compound_info = COMPOUND_COLORS.get(
-                    compound_raw, {"bg": "#888888", "label": "?"}
-                )
-                strategy.append(
-                    {
-                        "compound": compound_raw,
-                        "color": compound_info["bg"],
-                        "label": compound_info["label"],
-                    }
-                )
-
-            # ---- CONSTRUCCIÓN DEL DTO FINAL ----
-            # Reutilizamos format_timedelta() convirtiendo los floats estadísticos
-            # a pd.Timedelta para no duplicar lógica de formateo.
-            # El casting explícito a float/int es CRÍTICO: los tipos nativos de
-            # Numpy (float64, int64) rompen el serializador JSON de FastAPI.
-            response_data[driver_abbr] = {
-                "best_lap": {
-                    "time": format_timedelta(best_lap["LapTime"]),
-                    "lap_number": int(best_lap["LapNumber"])
-                    if pd.notna(best_lap["LapNumber"])
-                    else None,
-                },
-                "average": format_timedelta(pd.to_timedelta(mean_s, unit="s")),
-                "median": format_timedelta(pd.to_timedelta(median_s, unit="s")),
-                "std_dev": format_timedelta(pd.to_timedelta(std_s, unit="s")),
-                "consistency": float(consistency),
-                "valid_laps": int(len(laps_for_count)),
-                "strategy": strategy,
-            }
-
-        return response_data
-
+        session = await _load_session(year, event_name, session_name)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=404, detail=f"Sesión no encontrada: {e}")
+
+    driver_list = [d.strip().upper() for d in drivers.split(",")]
+    all_laps = session.laps.pick_drivers(driver_list)
+
+    summaries: dict[str, DriverSummaryDTO | None] = {}
+    for driver_abbr in driver_list:
+        driver_laps = all_laps[all_laps["Driver"] == driver_abbr].copy()
+        summaries[driver_abbr] = _build_driver_summary(driver_laps, session)
+
+    return SummaryResponseDTO(drivers=driver_list, summaries=summaries)
 
 
 @app.get("/api/analysis/{year}/{event_name}/{session_name}/stints")
