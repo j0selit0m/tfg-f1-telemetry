@@ -1,15 +1,16 @@
-// App.jsx — Componente raíz. Gestiona el estado global de filtros y la navegación por pestañas.
-// Patrón: Lifting State Up — los filtros suben desde SidebarFilter y se distribuyen a cada vista.
+// Componente raíz. Gestiona el estado global de filtros y la navegación por pestañas.
+// Patrón: Lifting State Up — los filtros suben desde SidebarFilter y se distribuyen
+// a cada vista.
 
 import { useState } from 'react';
-import SidebarFilter from './components/SidebarFilter';
-import LapDataGrid from './components/LapDataGrid';
-import SummaryStatistics from './components/SummaryStatistics';
-import StintAnalysis from './components/StintAnalysis';
-import TelemetryView from './components/TelemetryView';
+import SidebarFilter from './features/sidebar';
+import LapDataGrid from './features/lapData';
+import SummaryStatistics from './features/summary';
+import StintAnalysis from './features/stints';
+import TelemetryView from './features/telemetry';
 
 // Registro declarativo de pestañas. Para añadir una vista nueva basta con importar
-// el componente y añadir un objeto aquí; el render y la barra de tabs se actualizan solos.
+// el componente y añadir un objeto aquí.
 const TABS = [
   { id: 'lap-data', label: 'Lap Data', component: LapDataGrid },
   { id: 'session-summary', label: 'Session Summary', component: SummaryStatistics },
@@ -17,15 +18,13 @@ const TABS = [
   { id: 'speed-telemetry', label: 'Speed Telemetry', component: TelemetryView },
 ];
 
-// ─── Componente principal ─────────────────────────────────────────────────────
-
 export default function App() {
   const [activeFilters, setActiveFilters] = useState(null);
   const [activeTab, setActiveTab] = useState(TABS[0].id);
 
-  // Lazy mount: solo se montan las pestañas que el usuario ha visitado al menos una vez.
-  // Evita 4 fetches en paralelo al pulsar Run Analysis y mantiene en memoria las ya visitadas
-  // para que el cambio entre tabs sea instantáneo a partir de la segunda visita.
+  // Lazy mount: solo se montan las pestañas visitadas al menos una vez.
+  // Evita fetches en paralelo al pulsar Run Analysis y mantiene en memoria
+  // las ya visitadas para que el cambio entre tabs sea instantáneo.
   const [visitedTabs, setVisitedTabs] = useState(new Set([TABS[0].id]));
 
   const handleTabChange = (tabId) => {
@@ -63,10 +62,9 @@ export default function App() {
   );
 }
 
-// ─── Sub-componentes ──────────────────────────────────────────────────────────
+// ── Sub-componentes ───────────────────────────────────────────────────────────
 
-// Header del área de contenido. Muestra el contexto de la sesión activa cuando hay
-// filtros aplicados; en caso contrario, una tagline neutra.
+// Muestra el contexto de la sesión activa cuando hay filtros aplicados.
 function Header({ filters }) {
   return (
     <header className="flex items-center gap-3 px-6 py-3 bg-[#111318] border-b border-gray-800 flex-shrink-0">
@@ -93,8 +91,6 @@ function Header({ filters }) {
   );
 }
 
-// Barra de navegación por pestañas. Recibe el array de tabs, el id activo y un
-// callback de cambio. Cada tab es un botón con su propio estado visual.
 function TabNav({ tabs, activeTab, onChange }) {
   return (
     <nav className="flex bg-[#111318] border-b border-gray-800 flex-shrink-0">
