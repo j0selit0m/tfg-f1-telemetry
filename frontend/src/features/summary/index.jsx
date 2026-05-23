@@ -8,7 +8,6 @@ export default function SummaryStatistics({ filters }) {
     const { data, isLoading, error, refetch } = useSessionSummary(filters);
 
     const fastestCode = data?.fastestDriver?.driverCode ?? null;
-    const driverKeys = filters?.driver ? filters.driver.split(',') : [];
 
     if (!filters) {
         return (
@@ -26,17 +25,6 @@ export default function SummaryStatistics({ filters }) {
     return (
         <div className="flex flex-col h-full w-full bg-[#0a0a0c] border border-gray-800 shadow-2xl font-sans text-gray-200">
 
-            {/* ── Cabecera ───────────────────────────────────────────────── */}
-
-            <div className="bg-gradient-to-r from-gray-900 to-black border-b-2 border-gray-700 px-5 py-4 shrink-0">
-                <h3 className="text-red-600 font-black italic uppercase tracking-widest text-xl leading-none">
-                    Session Summary
-                </h3>
-                <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest mt-1">
-                    {filters.round} · {filters.session} · Season {filters.year}
-                </p>
-            </div>
-
             {/* ── Banner de error ────────────────────────────────────────── */}
 
             {error && !isLoading && (
@@ -52,29 +40,29 @@ export default function SummaryStatistics({ filters }) {
                 </div>
             )}
 
+            {/* ── Loading ────────────────────────────────────────────────── */}
+
+            {isLoading && (
+                <div className="absolute inset-0 z-20 bg-[#0a0a0c]/80 backdrop-blur-sm flex flex-col items-center justify-center">
+                    <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin mb-4" />
+                    <div className="text-red-600 font-mono text-lg uppercase tracking-widest animate-pulse">
+                        Processing Telemetry...
+                    </div>
+                </div>
+            )}
+
             {/* ── Grid de tarjetas ───────────────────────────────────────── */}
 
             <div className="flex-1 overflow-y-auto relative">
-                {data?.drivers.map(driver => (
-                    <DriverCard
-                        key={driver.driverCode}
-                        driver={driver}
-                        isFastest={driver.driverCode === fastestCode}
-                        driverColor={filters?.driverColors?.[driver.driverCode] ?? '#FFFFFF'}
-                    />
-                ))}
                 <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {isLoading
-                        ? driverKeys.map(code => <SkeletonCard key={code} />)
-                        : data?.drivers.map(driver => (
-                            <DriverCard
-                                key={driver.driverCode}
-                                driver={driver}
-                                isFastest={driver.driverCode === fastestCode}
-                                driverColor={filters?.driverColors?.[driver.driverCode] ?? '#FFFFFF'}
-                            />
-                        ))
-                    }
+                    {data?.drivers.map(driver => (
+                        <DriverCard
+                            key={driver.driverCode}
+                            driver={driver}
+                            isFastest={driver.driverCode === fastestCode}
+                            driverColor={filters?.driverColors?.[driver.driverCode] ?? '#FFFFFF'}
+                        />
+                    ))}
                 </div>
             </div>
         </div>

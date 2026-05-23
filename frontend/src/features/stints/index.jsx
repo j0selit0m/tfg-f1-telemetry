@@ -3,7 +3,6 @@
 
 import { useStintAnalysis } from './useStintAnalysis';
 import StintCell from './StintCell';
-import SkeletonRow from './SkeletonRow';
 
 export default function StintAnalysis({ filters }) {
     const { data, isLoading, error, refetch } = useStintAnalysis(filters);
@@ -27,17 +26,6 @@ export default function StintAnalysis({ filters }) {
     return (
         <div className="flex flex-col h-full w-full bg-[#0a0a0c] border border-gray-800 shadow-2xl font-sans text-gray-200">
 
-            {/* ── Cabecera ───────────────────────────────────────────────── */}
-
-            <div className="bg-gradient-to-r from-gray-900 to-black border-b-2 border-gray-700 px-5 py-4 shrink-0">
-                <h3 className="text-red-600 font-black italic uppercase tracking-widest text-xl leading-none">
-                    Stint Analysis
-                </h3>
-                <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest mt-1">
-                    {filters.round} · {filters.session} · Season {filters.year}
-                </p>
-            </div>
-
             {/* ── Banner de error ────────────────────────────────────────── */}
 
             {error && !isLoading && (
@@ -55,7 +43,7 @@ export default function StintAnalysis({ filters }) {
 
             {/* ── Tabla ──────────────────────────────────────────────────── */}
 
-            <div className="flex-1 overflow-auto relative">
+            <div className="flex-1 overflow-auto relative pt-4">
 
                 {isLoading && (
                     <div className="absolute inset-0 z-20 bg-[#0a0a0c]/80 backdrop-blur-sm flex flex-col items-center justify-center">
@@ -92,14 +80,6 @@ export default function StintAnalysis({ filters }) {
                     </thead>
 
                     <tbody className="font-mono">
-
-                        {isLoading && (
-                            <>
-                                <SkeletonRow driverCount={driverKeys.length} />
-                                <SkeletonRow driverCount={driverKeys.length} />
-                                <SkeletonRow driverCount={driverKeys.length} />
-                            </>
-                        )}
 
                         {!isLoading && data?.stints.map(stint => (
                             <tr key={stint.stintNumber} className="border-b border-gray-800/50 hover:bg-gray-800/20 transition-colors">

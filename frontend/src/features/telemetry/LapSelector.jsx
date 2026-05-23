@@ -9,7 +9,7 @@ export default function LapSelector({ rows, setRows, availableDrivers, available
     const updateRow = (i, f, v) => setRows(p => p.map((r, idx) => idx === i ? { ...r, [f]: v } : r));
 
     return (
-        <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-3 flex-wrap">
             {rows.map((row, i) => (
                 <div key={i} className="flex items-center gap-2">
                     <select
@@ -40,9 +40,10 @@ export default function LapSelector({ rows, setRows, availableDrivers, available
                     >
                         ✕
                     </button>
+                    {i < rows.length - 1 && <span className="text-gray-700 font-black">|</span>}
                 </div>
             ))}
-            <div className="flex gap-2 mt-1">
+            <div className="flex gap-2">
                 <button
                     onClick={addRow}
                     className="border border-gray-700 text-gray-500 px-2 py-1 text-[10px] font-bold uppercase tracking-widest hover:border-gray-500 hover:text-white transition-colors"

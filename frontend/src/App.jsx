@@ -15,7 +15,7 @@ const TABS = [
   { id: 'lap-data', label: 'Lap Data', component: LapDataGrid },
   { id: 'session-summary', label: 'Session Summary', component: SummaryStatistics },
   { id: 'stint-analysis', label: 'Stint Analysis', component: StintAnalysis },
-  { id: 'speed-telemetry', label: 'Speed Telemetry', component: TelemetryView },
+  { id: 'speed-telemetry', label: 'Telemetry', component: TelemetryView },
 ];
 
 export default function App() {
@@ -67,23 +67,23 @@ export default function App() {
 // Muestra el contexto de la sesión activa cuando hay filtros aplicados.
 function Header({ filters }) {
   return (
-    <header className="flex items-center gap-3 px-6 py-3 bg-[#111318] border-b border-gray-800 flex-shrink-0">
+    <header className="flex items-center gap-3 px-5 py-3 bg-[#111318] border-b border-gray-800 flex-shrink-0">
       {filters ? (
         <>
-          <span className="text-base font-black italic uppercase tracking-tight text-white">
+          <span className="text-xl font-black italic uppercase tracking-tight text-white">
             {filters.round}
           </span>
-          <span className="text-red-600 font-black text-sm">·</span>
-          <span className="text-base font-black italic uppercase tracking-tight text-gray-300">
+          <span className="text-red-600 font-black">·</span>
+          <span className="text-xl font-black italic uppercase tracking-tight text-gray-300">
             {filters.session}
           </span>
-          <span className="text-red-600 font-black text-sm">·</span>
-          <span className="text-sm font-mono font-bold text-gray-500 tabular-nums">
+          <span className="text-red-600 font-black">·</span>
+          <span className="text-base font-mono font-bold text-gray-500 tabular-nums">
             {filters.year}
           </span>
         </>
       ) : (
-        <span className="text-sm text-gray-500 uppercase tracking-widest">
+        <span className="text-base text-gray-500 uppercase tracking-widest font-mono">
           Formula 1 Data Analysis
         </span>
       )}
@@ -100,7 +100,7 @@ function TabNav({ tabs, activeTab, onChange }) {
           onClick={() => onChange(tab.id)}
           aria-selected={activeTab === tab.id}
           className={[
-            'px-5 py-3 text-xs font-semibold uppercase tracking-widest',
+            'px-8 py-4 text-base font-black uppercase tracking-widest font-mono',
             'transition-colors duration-150 border-b-2 -mb-px cursor-pointer',
             activeTab === tab.id
               ? 'text-white border-red-600'

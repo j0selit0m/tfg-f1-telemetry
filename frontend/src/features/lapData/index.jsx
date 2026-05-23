@@ -117,7 +117,7 @@ function Legend({ filters }) {
         <div className="bg-gradient-to-r from-gray-900 to-black border-b-2 border-gray-700 shrink-0">
             <button
                 onClick={() => setOpen(prev => !prev)}
-                className="w-full flex items-center justify-between px-5 py-3 hover:bg-white/5 transition-colors"
+                className="w-full flex items-center justify-center px-5 py-3 hover:bg-white/5 transition-colors"
             >
                 <h3 className="text-gray-300 font-bold uppercase tracking-widest text-s">
                     Data Display Legend

@@ -124,15 +124,8 @@ export default function TelemetryView({ filters }) {
 
             {/* ── Cabecera ───────────────────────────────────────────────── */}
 
-            <div className="bg-gradient-to-r from-gray-900 to-black border-b-2 border-gray-700 px-5 py-3 flex items-center justify-between gap-4 shrink-0">
-                <div>
-                    <h3 className="text-red-600 font-black italic uppercase tracking-widest text-xl leading-none">
-                        Telemetry
-                    </h3>
-                    <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest mt-1">
-                        {filters.round} · Season {filters.year}
-                    </p>
-                </div>
+            {/* ── Selector de vueltas ───────────────────────────────────── */}
+            <div className="bg-[#111318] border-b border-gray-800 px-5 py-3 flex items-center gap-4 shrink-0 flex-wrap">
                 <LapSelector
                     rows={rows}
                     setRows={setRows}
