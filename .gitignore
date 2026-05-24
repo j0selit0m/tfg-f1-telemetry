@@ -7,8 +7,33 @@ backend/venv/
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
+
+# Variables de entorno
 .env
+.env.local
+.env.*.local
+.env.development
+.env.production
+
+# Cachés de FastF1 (ambas rutas)
 fastf1_cache/
+fastf1_cache_local/
+backend/fastf1_cache/
+backend/fastf1_cache_local/
+
+# Cachés de herramientas Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Distribución Python
+build/
+dist/
+*.egg-info/
 
 # 2. Frontend (Node / Vite / React)
 frontend/node_modules/
@@ -16,11 +41,28 @@ frontend/dist/
 frontend/dist-ssr/
 *.local
 
-# 3. Entorno de Desarrollo (VS Code / Visual Studio)
+# 3. Entorno de desarrollo (IDEs)
 .vscode/
 .vs/
+.idea/
 *.code-workspace
+*.swp
+*.swo
 
-# 4. Archivos del Sistema Operativo (Windows)
+# 4. Archivos del sistema operativo
 Thumbs.db
 Desktop.ini
+.DS_Store
+
+# 5. Logs y bases de datos locales
+*.log
+*.sqlite
+*.sqlite3
+*.db
+
+# 6. Claves y certificados (preventivo)
+*.pem
+*.key
+*.cert
+*.crt
+*.pfx

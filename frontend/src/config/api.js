@@ -1,2 +1,3 @@
-// URL base del backend. Único punto de configuración de red de la aplicación.
-export const API_BASE = 'http://localhost:8000/api';
+// URL base del backend. Configurable vía variable de entorno VITE_API_BASE.
+// Si no está definida, se usa el valor por defecto para desarrollo local.
+export const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api';
