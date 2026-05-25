@@ -11,7 +11,7 @@ export default function SummaryStatistics({ filters }) {
 
     if (!filters) {
         return (
-            <div className="flex h-full items-center justify-center flex-col opacity-50">
+            <div className="flex items-center justify-center flex-col opacity-50 h-64">
                 <h2 className="text-2xl font-black italic uppercase tracking-widest text-gray-500">
                     Summary Standby
                 </h2>

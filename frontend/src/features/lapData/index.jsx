@@ -13,8 +13,8 @@ export default function LapDataGrid({ filters }) {
 
     if (!filters) {
         return (
-            <div className="flex h-full items-center justify-center flex-col opacity-50">
-                <h2 className="text-2xl font-black italic uppercase tracking-widest text-gray-500">Telemetry Standby</h2>
+            <div className="flex items-center justify-center flex-col opacity-50 h-64">
+                <h2 className="text-2xl font-black italic uppercase tracking-widest text-gray-500">Lap Data Standby</h2>
                 <p className="text-sm font-mono text-gray-600 mt-2">
                     Select parameters and drivers in the side panel to start the analysis.
                 </p>
