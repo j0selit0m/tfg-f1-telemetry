@@ -11,7 +11,7 @@ import ChartWrapper from './ChartWrapper';
 import CrosshairOverlay from './CrosshairOverlay';
 import ChannelTooltip from './ChannelTooltip';
 
-const CHART_MARGIN = { top: 32, right: 8, left: 30, bottom: 20 };
+import { CHART_MARGIN, Y_AXIS_WIDTH, PLOT_LEFT_OFFSET, PLOT_RIGHT_OFFSET } from './chartConstants';
 
 const GearChart = memo(function GearChart({
     title, visibleData, driverKeys, domain, overlayRef, tooltipRef,
@@ -41,6 +41,7 @@ const GearChart = memo(function GearChart({
                                 <XAxis dataKey="distance" type="number" domain={domain} hide />
                             )}
                             <YAxis
+                                width={Y_AXIS_WIDTH}
                                 domain={[1, 8]} ticks={[1, 2, 3, 4, 5, 6, 7, 8]}
                                 stroke="#6b7280"
                                 tick={{ fill: '#9ca3af', fontSize: 13, fontFamily: 'monospace' }}
@@ -82,9 +83,9 @@ const GearChart = memo(function GearChart({
                     className="absolute pointer-events-none"
                     style={{
                         top: CHART_MARGIN.top,
-                        left: CHART_MARGIN.left,
-                        right: CHART_MARGIN.right,
-                        bottom: showXAxis ? 15 : 4,
+                        left: PLOT_LEFT_OFFSET,
+                        right: PLOT_RIGHT_OFFSET,
+                        bottom: showXAxis ? CHART_MARGIN.bottom : 4,
                     }}
                 >
                     <CrosshairOverlay ref={overlayRef} />

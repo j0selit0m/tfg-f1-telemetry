@@ -1,11 +1,7 @@
-// Hook que encapsula toda la lógica de zoom y pan de los gráficos de telemetría.
-// Gestiona el dominio visible, el wheel handler con passive:false y el pan con ratón.
-
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { PLOT_LEFT_OFFSET, PLOT_RIGHT_OFFSET } from './chartConstants';
 
 const ZOOM_FACTOR = 0.15;
-const CHART_MARGIN_LEFT = 27;
-const CHART_MARGIN_RIGHT = 8;
 
 export function useChartZoom(maxDistance) {
     const [domainStart, setDomainStart] = useState(0);
@@ -40,19 +36,20 @@ export function useChartZoom(maxDistance) {
     }, []);
 
     const pixelToDistance = useCallback((clientX, rect) => {
-        const plotArea = rect.left + CHART_MARGIN_LEFT;
-        const plotWidth = rect.width - CHART_MARGIN_LEFT - CHART_MARGIN_RIGHT;
-        const ratio = Math.max(0, Math.min(1, (clientX - plotArea) / plotWidth));
+        const plotLeft = rect.left + PLOT_LEFT_OFFSET;
+        const plotWidth = rect.width - PLOT_LEFT_OFFSET - PLOT_RIGHT_OFFSET;
+        const ratio = Math.max(0, Math.min(1, (clientX - plotLeft) / plotWidth));
         const { start, end } = domainRef.current;
         return start + ratio * (end - start);
     }, []);
 
-    // Devuelve un handler de rueda listo para registrar con { passive: false }
     const buildWheelHandler = useCallback((getRect) => (e) => {
         e.preventDefault();
         const rect = getRect();
-        const w = rect.width - CHART_MARGIN_LEFT - CHART_MARGIN_RIGHT;
-        const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left - CHART_MARGIN_LEFT) / w));
+        const plotWidth = rect.width - PLOT_LEFT_OFFSET - PLOT_RIGHT_OFFSET;
+        const ratio = Math.max(0, Math.min(1,
+            (e.clientX - rect.left - PLOT_LEFT_OFFSET) / plotWidth
+        ));
         const { start, end, max } = domainRef.current;
         const range = end - start;
         const delta = e.deltaY > 0 ? 1 : -1;
@@ -74,9 +71,9 @@ export function useChartZoom(maxDistance) {
     const handleMouseMove = useCallback((e) => {
         if (!panRef.current.active) return;
         const rect = e.currentTarget.getBoundingClientRect();
-        const w = rect.width - CHART_MARGIN_LEFT - CHART_MARGIN_RIGHT;
+        const plotWidth = rect.width - PLOT_LEFT_OFFSET - PLOT_RIGHT_OFFSET;
         const range = panRef.current.startEnd - panRef.current.startStart;
-        const delta = -(e.clientX - panRef.current.startX) / w * range;
+        const delta = -(e.clientX - panRef.current.startX) / plotWidth * range;
         applyDomain(
             panRef.current.startStart + delta,
             panRef.current.startEnd + delta,

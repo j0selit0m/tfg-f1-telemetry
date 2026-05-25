@@ -11,7 +11,7 @@ import ChartWrapper from './ChartWrapper';
 import CrosshairOverlay from './CrosshairOverlay';
 import ChannelTooltip from './ChannelTooltip';
 
-const CHART_MARGIN = { top: 32, right: 8, left: 30, bottom: 20 };
+import { CHART_MARGIN, Y_AXIS_WIDTH, PLOT_LEFT_OFFSET, PLOT_RIGHT_OFFSET } from './chartConstants';
 
 const ChannelChart = memo(function ChannelChart({
     title, visibleData, driverKeys, domain, overlayRef, tooltipRef,
@@ -42,6 +42,7 @@ const ChannelChart = memo(function ChannelChart({
                                 <XAxis dataKey="distance" type="number" domain={domain} hide />
                             )}
                             <YAxis
+                                width={Y_AXIS_WIDTH}
                                 domain={yDomain ?? ['auto', 'auto']}
                                 stroke="#6b7280"
                                 tick={{ fill: '#9ca3af', fontSize: 13, fontFamily: 'monospace' }}
@@ -83,8 +84,8 @@ const ChannelChart = memo(function ChannelChart({
                     className="absolute pointer-events-none"
                     style={{
                         top: CHART_MARGIN.top,
-                        left: CHART_MARGIN.left,
-                        right: CHART_MARGIN.right,
+                        left: PLOT_LEFT_OFFSET,
+                        right: PLOT_RIGHT_OFFSET,
                         bottom: showXAxis ? CHART_MARGIN.bottom : 4,
                     }}
                 >
