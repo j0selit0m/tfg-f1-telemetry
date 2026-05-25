@@ -1,56 +1,69 @@
-// Tooltip flotante que muestra el valor interpolado de cada canal en la
-// distancia donde se encuentra el cursor (crosshair).
+// Tooltip imperativo de un canal. Muestra la distancia y el valor de cada
+// piloto a esa distancia. Se actualiza vía ref para no provocar re-renders.
 
-// Interpola el valor de un campo entre los dos puntos más cercanos a la distancia dada
-function interpolate(data, distance, field) {
-    if (!data?.length) return null;
-    let lo = null, hi = null;
-    for (const pt of data) {
-        if (pt.distance <= distance) lo = pt;
-        else { hi = pt; break; }
-    }
-    if (!lo) return hi?.[field] ?? null;
-    if (!hi) return lo?.[field] ?? null;
-    const t = (distance - lo.distance) / (hi.distance - lo.distance);
-    return lo[field] + t * (hi[field] - lo[field]);
-}
+import { forwardRef, useImperativeHandle, useRef } from 'react';
 
-const CHANNEL_CONFIG = {
-    speed: { field: 'speed', fmt: v => `${Math.round(v)} km/h` },
-    throttle: { field: 'throttle', fmt: v => `${Math.round(v)}%` },
-    brake: { field: 'brake', fmt: v => v >= 0.5 ? 'ON' : 'OFF' },
-    rpm: { field: 'rpm', fmt: v => `${Math.round(v)}` },
-    gear: { field: 'gear', fmt: v => `${Math.round(v)}` },
-    drs: { field: 'drsActive', fmt: v => v >= 0.5 ? 'OPEN' : '—' },
+const FORMATTERS = {
+    speed: v => v == null ? '—' : `${Math.round(v)} km/h`,
+    throttle: v => v == null ? '—' : `${Math.round(v)} %`,
+    brake: v => v == null ? '—' : (v ? 'ON' : 'OFF'),
+    rpm: v => v == null ? '—' : `${Math.round(v)}`,
+    gear: v => v == null ? '—' : `${v}`,
+    drs: v => v == null ? '—' : (v ? 'ON' : 'OFF'),
 };
 
-export default function ChannelTooltip({ distance, drivers, channel, getDriverColor }) {
-    if (distance === null) return null;
-    const config = CHANNEL_CONFIG[channel];
-    if (!config) return null;
+const ChannelTooltip = forwardRef(function ChannelTooltip(
+    { driverKeys, getDriverColor, channel, drivers },
+    ref
+) {
+    const boxRef = useRef(null);
+    const distanceRef = useRef(null);
+    const valueRefs = useRef({});
+
+    useImperativeHandle(ref, () => ({
+        setData(distance, values) {
+            const box = boxRef.current;
+            if (!box) return;
+            if (distance === null || distance === undefined) {
+                box.style.opacity = '0';
+                return;
+            }
+            box.style.opacity = '1';
+            if (distanceRef.current) {
+                distanceRef.current.textContent = `${Math.round(distance)} m`;
+            }
+            const fmt = FORMATTERS[channel] ?? (v => String(v));
+            for (const key of driverKeys) {
+                const el = valueRefs.current[key];
+                if (el) el.textContent = fmt(values?.[key]);
+            }
+        }
+    }));
 
     return (
         <div
-            style={{ position: 'absolute', top: 8, right: 8, zIndex: 10, pointerEvents: 'none' }}
-            className="bg-black/90 border border-gray-700 shadow-lg font-mono text-xs px-2.5 py-2 flex flex-col gap-1.5"
+            ref={boxRef}
+            className="absolute top-2 right-2 bg-black/85 backdrop-blur-sm border border-gray-700 px-3 py-2 pointer-events-none z-20 font-mono text-xs"
+            style={{ opacity: 0 }}
         >
-            <div className="border-b border-gray-700 pb-1.5 mb-0.5">
-                <span className="text-gray-500 text-[10px] uppercase tracking-widest">Distance</span>
-                <span className="block text-white font-black text-base tabular-nums leading-none mt-0.5">
-                    {Math.round(distance)} m
-                </span>
+            <div ref={distanceRef} className="text-gray-400 mb-1 text-[10px] uppercase tracking-widest">
+                — m
             </div>
-            {Object.values(drivers).map(driver => {
-                const v = interpolate(driver.data, distance, config.field);
-                const color = getDriverColor(driver.key);
+            {driverKeys.map(key => {
+                const code = drivers?.[key]?.driverCode ?? key.split('_')[0];
+                const color = getDriverColor(key);
                 return (
-                    <div key={driver.key} className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                        <span className="font-black" style={{ color }}>{driver.driverCode}</span>
-                        <span className="text-white tabular-nums">{v !== null ? config.fmt(v) : '—'}</span>
+                    <div key={key} className="flex items-center gap-3">
+                        <span className="font-black w-8" style={{ color }}>{code}</span>
+                        <span
+                            ref={el => { valueRefs.current[key] = el; }}
+                            className="text-white font-bold ml-auto"
+                        >—</span>
                     </div>
                 );
             })}
         </div>
     );
-}
+});
+
+export default ChannelTooltip;

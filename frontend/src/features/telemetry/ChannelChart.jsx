@@ -1,4 +1,6 @@
 // Gráfico de un canal de telemetría continuo (velocidad, acelerador, RPM).
+// Crosshair y tooltip viven como overlays imperativos fuera de Recharts
+// para eliminar re-renders durante el movimiento del ratón.
 
 import { memo } from 'react';
 import {
@@ -6,12 +8,13 @@ import {
     CartesianGrid, ReferenceLine, ResponsiveContainer,
 } from 'recharts';
 import ChartWrapper from './ChartWrapper';
+import CrosshairOverlay from './CrosshairOverlay';
 import ChannelTooltip from './ChannelTooltip';
 
 const CHART_MARGIN = { top: 32, right: 8, left: 30, bottom: 20 };
 
 const ChannelChart = memo(function ChannelChart({
-    title, visibleData, driverKeys, domain, crosshairDistance,
+    title, visibleData, driverKeys, domain, overlayRef, tooltipRef,
     corners, getDriverColor, drivers, channel, yLabel, yDomain,
     height, showXAxis, interaction,
 }) {
@@ -23,12 +26,6 @@ const ChannelChart = memo(function ChannelChart({
                 <span className="text-gray-500 font-mono text-[10px] uppercase tracking-widest">{title}</span>
             </div>
             <div className="relative">
-                <ChannelTooltip
-                    distance={crosshairDistance}
-                    drivers={drivers}
-                    channel={channel}
-                    getDriverColor={getDriverColor}
-                />
                 <ChartWrapper height={height} {...interaction}>
                     <ResponsiveContainer width="100%" height={height}>
                         <ComposedChart data={visibleData} margin={CHART_MARGIN}>
@@ -57,9 +54,6 @@ const ChannelChart = memo(function ChannelChart({
                                     label={{ value: c.label, position: 'top', fill: '#4b5563', fontSize: 12, fontFamily: 'monospace' }}
                                 />
                             ))}
-                            {crosshairDistance !== null && (
-                                <ReferenceLine x={crosshairDistance} stroke="#dc2626" strokeWidth={1.5} strokeOpacity={0.8} />
-                            )}
                             {driverKeys.map(key => (
                                 <Line
                                     key={key}
@@ -76,6 +70,26 @@ const ChannelChart = memo(function ChannelChart({
                         </ComposedChart>
                     </ResponsiveContainer>
                 </ChartWrapper>
+
+                <ChannelTooltip
+                    ref={tooltipRef}
+                    driverKeys={driverKeys}
+                    getDriverColor={getDriverColor}
+                    channel={channel}
+                    drivers={drivers}
+                />
+
+                <div
+                    className="absolute pointer-events-none"
+                    style={{
+                        top: CHART_MARGIN.top,
+                        left: CHART_MARGIN.left,
+                        right: CHART_MARGIN.right,
+                        bottom: showXAxis ? CHART_MARGIN.bottom : 4,
+                    }}
+                >
+                    <CrosshairOverlay ref={overlayRef} />
+                </div>
             </div>
         </div>
     );

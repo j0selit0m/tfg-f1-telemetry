@@ -1,5 +1,6 @@
 // Gráfico de marcha. Usa type="stepAfter" y un dominio fijo [1,8]
 // para representar correctamente los cambios de marcha.
+// Crosshair y tooltip imperativos fuera de Recharts.
 
 import { memo } from 'react';
 import {
@@ -7,12 +8,13 @@ import {
     CartesianGrid, ReferenceLine, ResponsiveContainer,
 } from 'recharts';
 import ChartWrapper from './ChartWrapper';
+import CrosshairOverlay from './CrosshairOverlay';
 import ChannelTooltip from './ChannelTooltip';
 
 const CHART_MARGIN = { top: 32, right: 8, left: 30, bottom: 20 };
 
 const GearChart = memo(function GearChart({
-    title, visibleData, driverKeys, domain, crosshairDistance,
+    title, visibleData, driverKeys, domain, overlayRef, tooltipRef,
     corners, getDriverColor, drivers, height, showXAxis, interaction,
 }) {
     const visibleCorners = corners.filter(c => c.distance >= domain[0] && c.distance <= domain[1]);
@@ -23,12 +25,6 @@ const GearChart = memo(function GearChart({
                 <span className="text-gray-500 font-mono text-[10px] uppercase tracking-widest">{title}</span>
             </div>
             <div className="relative">
-                <ChannelTooltip
-                    distance={crosshairDistance}
-                    drivers={drivers}
-                    channel="gear"
-                    getDriverColor={getDriverColor}
-                />
                 <ChartWrapper height={height} {...interaction}>
                     <ResponsiveContainer width="100%" height={height}>
                         <ComposedChart data={visibleData} margin={{ ...CHART_MARGIN, bottom: showXAxis ? 15 : 4 }}>
@@ -57,9 +53,6 @@ const GearChart = memo(function GearChart({
                                     label={{ value: c.label, position: 'top', fill: '#4b5563', fontSize: 12, fontFamily: 'monospace' }}
                                 />
                             ))}
-                            {crosshairDistance !== null && (
-                                <ReferenceLine x={crosshairDistance} stroke="#dc2626" strokeWidth={1.5} strokeOpacity={0.8} />
-                            )}
                             {driverKeys.map(key => (
                                 <Line
                                     key={key}
@@ -76,6 +69,26 @@ const GearChart = memo(function GearChart({
                         </ComposedChart>
                     </ResponsiveContainer>
                 </ChartWrapper>
+
+                <ChannelTooltip
+                    ref={tooltipRef}
+                    driverKeys={driverKeys}
+                    getDriverColor={getDriverColor}
+                    channel="gear"
+                    drivers={drivers}
+                />
+
+                <div
+                    className="absolute pointer-events-none"
+                    style={{
+                        top: CHART_MARGIN.top,
+                        left: CHART_MARGIN.left,
+                        right: CHART_MARGIN.right,
+                        bottom: showXAxis ? 15 : 4,
+                    }}
+                >
+                    <CrosshairOverlay ref={overlayRef} />
+                </div>
             </div>
         </div>
     );

@@ -1,13 +1,15 @@
 // Orquestador de la vista de telemetría. Gestiona la selección de vueltas,
 // compone los gráficos por canal y coordina el sistema de zoom/pan/crosshair.
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTelemetry } from './useTelemetry';
 import { useChartZoom } from './useChartZoom';
 import ChannelChart from './ChannelChart';
 import BinaryChart from './BinaryChart';
 import GearChart from './GearChart';
 import LapSelector from './LapSelector';
+
+const CHART_CHANNELS = ['speed', 'throttle', 'brake', 'rpm', 'gear', 'drs'];
 
 // Construye el parámetro de drivers para la URL a partir de las filas del selector
 function buildParamFromRows(rows) {
@@ -36,8 +38,10 @@ function mergeDriverData(drivers) {
 export default function TelemetryView({ filters }) {
     const [rows, setRows] = useState([]);
     const [driverParam, setDriverParam] = useState('');
-    const [crosshairDistance, setCrosshairDistance] = useState(null);
-
+    // Refs a los overlays de crosshair de cada uno de los 6 charts.
+    // Permiten actualizar la posición de la línea roja sin re-renderizar nada.
+    const crosshairRefs = useRef([]);
+    const tooltipRefs = useRef([]);
     const availableDrivers = useMemo(
         () => filters?.driver ? filters.driver.split(',').map(s => s.trim()) : [],
         [filters?.driver]
@@ -83,13 +87,67 @@ export default function TelemetryView({ filters }) {
     const handleChartMouseMove = useCallback((e) => {
         handleMouseMove(e);
         if (!data) return;
+
         const rect = e.currentTarget.getBoundingClientRect();
-        setCrosshairDistance(pixelToDistance(e.clientX, rect));
-    }, [handleMouseMove, pixelToDistance, data]);
+
+        // Recharts reserva estos márgenes para los ejes (deben coincidir con
+        // CHART_MARGIN en los componentes de chart).
+        const MARGIN_LEFT = 30;
+        const MARGIN_RIGHT = 8;
+
+        // El área de plot real está dentro de los márgenes.
+        const plotWidth = rect.width - MARGIN_LEFT - MARGIN_RIGHT;
+        if (plotWidth <= 0) return;
+
+        // Posición del ratón dentro del plot area, no del contenedor.
+        const mouseInPlotX = e.clientX - rect.left - MARGIN_LEFT;
+        const clampedX = Math.max(0, Math.min(plotWidth, mouseInPlotX));
+
+        // Distancia y porcentaje calculados desde las coordenadas del plot area.
+        const [d0, d1] = domain;
+        const distance = d0 + (clampedX / plotWidth) * (d1 - d0);
+        const pct = (clampedX / plotWidth) * 100;
+
+        // 1) Mover las 6 líneas rojas
+        crosshairRefs.current.forEach(ref => ref?.setPercent(pct));
+
+        // 2) Búsqueda binaria del valor más cercano POR PILOTO
+        const closestPerDriver = {};
+        for (const key of driverKeys) {
+            const arr = data.drivers[key]?.data;
+            if (!arr || !arr.length) continue;
+            let lo = 0, hi = arr.length - 1;
+            while (lo < hi) {
+                const mid = (lo + hi) >> 1;
+                if (arr[mid].distance < distance) lo = mid + 1;
+                else hi = mid;
+            }
+            closestPerDriver[key] = arr[lo];
+        }
+
+        // 3) Mapear canal → campo del DTO de telemetría
+        const FIELD = {
+            speed: 'speed', throttle: 'throttle', brake: 'brake',
+            rpm: 'rpm', gear: 'gear', drs: 'drsActive',
+        };
+
+        // 4) Actualizar los 6 tooltips
+        tooltipRefs.current.forEach((ref, i) => {
+            if (!ref) return;
+            const ch = CHART_CHANNELS[i];
+            const field = FIELD[ch];
+            const values = {};
+            for (const key of driverKeys) {
+                values[key] = closestPerDriver[key]?.[field];
+            }
+            ref.setData(distance, values);
+        });
+    }, [handleMouseMove, data, domain, driverKeys]);
 
     const handleChartMouseLeave = useCallback((e) => {
         handleMouseUp(e);
-        setCrosshairDistance(null);
+        crosshairRefs.current.forEach(ref => ref?.setPercent(null));
+        tooltipRefs.current.forEach(ref => ref?.setData(null, {}));
     }, [handleMouseUp]);
 
     const interaction = useMemo(() => ({
@@ -179,18 +237,34 @@ export default function TelemetryView({ filters }) {
 
             {!isLoading && data && (
                 <div className="relative">
-                    <ChannelChart {...sharedProps} crosshairDistance={crosshairDistance}
-                        title="Speed" channel="speed" yLabel="km/h" height={420} showXAxis />
-                    <ChannelChart {...sharedProps} crosshairDistance={crosshairDistance}
-                        title="Throttle" channel="throttle" yLabel="%" height={250} yDomain={[0, 100]} showXAxis />
-                    <BinaryChart  {...sharedProps} crosshairDistance={crosshairDistance}
-                        title="Brake" channel="brake" yLabel="Brake" height={180} showXAxis />
-                    <ChannelChart {...sharedProps} crosshairDistance={crosshairDistance}
-                        title="RPM" channel="rpm" yLabel="RPM" height={250} showXAxis />
-                    <GearChart    {...sharedProps} crosshairDistance={crosshairDistance}
-                        title="Gear" height={220} showXAxis />
-                    <BinaryChart  {...sharedProps} crosshairDistance={crosshairDistance}
-                        title="DRS" channel="drs" yLabel="DRS" height={180} showXAxis />
+                    {!isLoading && data && (
+                        <div className="relative">
+                            <ChannelChart {...sharedProps}
+                                overlayRef={el => { crosshairRefs.current[0] = el; }}
+                                tooltipRef={el => { tooltipRefs.current[0] = el; }}
+                                title="Speed" channel="speed" yLabel="km/h" height={420} showXAxis />
+                            <ChannelChart {...sharedProps}
+                                overlayRef={el => { crosshairRefs.current[1] = el; }}
+                                tooltipRef={el => { tooltipRefs.current[1] = el; }}
+                                title="Throttle" channel="throttle" yLabel="%" height={250} yDomain={[0, 100]} showXAxis />
+                            <BinaryChart {...sharedProps}
+                                overlayRef={el => { crosshairRefs.current[2] = el; }}
+                                tooltipRef={el => { tooltipRefs.current[2] = el; }}
+                                title="Brake" channel="brake" yLabel="Brake" height={180} showXAxis />
+                            <ChannelChart {...sharedProps}
+                                overlayRef={el => { crosshairRefs.current[3] = el; }}
+                                tooltipRef={el => { tooltipRefs.current[3] = el; }}
+                                title="RPM" channel="rpm" yLabel="RPM" height={250} showXAxis />
+                            <GearChart {...sharedProps}
+                                overlayRef={el => { crosshairRefs.current[4] = el; }}
+                                tooltipRef={el => { tooltipRefs.current[4] = el; }}
+                                title="Gear" height={220} showXAxis />
+                            <BinaryChart {...sharedProps}
+                                overlayRef={el => { crosshairRefs.current[5] = el; }}
+                                tooltipRef={el => { tooltipRefs.current[5] = el; }}
+                                title="DRS" channel="drs" yLabel="DRS" height={180} showXAxis />
+                        </div>
+                    )}
                 </div>
             )}
 
