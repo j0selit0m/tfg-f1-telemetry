@@ -112,23 +112,23 @@ export default function TelemetryView({ filters }) {
         crosshairRefs.current.forEach(ref => ref?.setPercent(pct));
 
         // 2) Mapear canal → campo del DTO
-const FIELD = {
-    speed: 'speed', throttle: 'throttle', brake: 'brake',
-    rpm: 'rpm', gear: 'gear', drs: 'drsActive',
-};
+        const FIELD = {
+            speed: 'speed', throttle: 'throttle', brake: 'brake',
+            rpm: 'rpm', gear: 'gear', drs: 'drsActive',
+        };
 
-// 3) Actualizar tooltips con el punto más cercano
-tooltipRefs.current.forEach((ref, i) => {
-    if (!ref) return;
-    const field = FIELD[CHART_CHANNELS[i]];
-    const values = {};
-    for (const key of driverKeys) {
-        const arr = data.drivers[key]?.data;
-        const pt = arr?.find(p => p.distance >= distance) ?? arr?.at(-1);
-        values[key] = pt?.[field] ?? null;
-    }
-    ref.setData(distance, values);
-});
+        // 3) Actualizar tooltips con el punto más cercano
+        tooltipRefs.current.forEach((ref, i) => {
+            if (!ref) return;
+            const field = FIELD[CHART_CHANNELS[i]];
+            const values = {};
+            for (const key of driverKeys) {
+                const arr = data.drivers[key]?.data;
+                const pt = arr?.find(p => p.distance >= distance) ?? arr?.at(-1);
+                values[key] = pt?.[field] ?? null;
+            }
+            ref.setData(distance, values);
+        });
     }, [handleMouseMove, data, domain, driverKeys]);
 
     const handleChartMouseLeave = useCallback((e) => {
