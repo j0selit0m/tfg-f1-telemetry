@@ -9,6 +9,8 @@ import BinaryChart from './BinaryChart';
 import GearChart from './GearChart';
 import LapSelector from './LapSelector';
 
+import { PLOT_LEFT_OFFSET, PLOT_RIGHT_OFFSET } from './chartConstants';
+
 const CHART_CHANNELS = ['speed', 'throttle', 'brake', 'rpm', 'gear', 'drs'];
 
 // Construye el parámetro de drivers para la URL a partir de las filas del selector
@@ -90,17 +92,13 @@ export default function TelemetryView({ filters }) {
 
         const rect = e.currentTarget.getBoundingClientRect();
 
-        // Recharts reserva estos márgenes para los ejes (deben coincidir con
-        // CHART_MARGIN en los componentes de chart).
-        const MARGIN_LEFT = 30;
-        const MARGIN_RIGHT = 8;
+        const plotWidth = rect.width - PLOT_LEFT_OFFSET - PLOT_RIGHT_OFFSET;
 
         // El área de plot real está dentro de los márgenes.
-        const plotWidth = rect.width - MARGIN_LEFT - MARGIN_RIGHT;
         if (plotWidth <= 0) return;
 
         // Posición del ratón dentro del plot area, no del contenedor.
-        const mouseInPlotX = e.clientX - rect.left - MARGIN_LEFT;
+        const mouseInPlotX = e.clientX - rect.left - PLOT_LEFT_OFFSET;
         const clampedX = Math.max(0, Math.min(plotWidth, mouseInPlotX));
 
         // Distancia y porcentaje calculados desde las coordenadas del plot area.
@@ -235,38 +233,37 @@ export default function TelemetryView({ filters }) {
 
             {/* ── Gráficos ───────────────────────────────────────────────── */}
 
-            {!isLoading && data && (
-                <div className="relative">
-                    {!isLoading && data && (
-                        <div className="relative">
-                            <ChannelChart {...sharedProps}
-                                overlayRef={el => { crosshairRefs.current[0] = el; }}
-                                tooltipRef={el => { tooltipRefs.current[0] = el; }}
-                                title="Speed" channel="speed" yLabel="km/h" height={420} showXAxis />
-                            <ChannelChart {...sharedProps}
-                                overlayRef={el => { crosshairRefs.current[1] = el; }}
-                                tooltipRef={el => { tooltipRefs.current[1] = el; }}
-                                title="Throttle" channel="throttle" yLabel="%" height={250} yDomain={[0, 100]} showXAxis />
-                            <BinaryChart {...sharedProps}
-                                overlayRef={el => { crosshairRefs.current[2] = el; }}
-                                tooltipRef={el => { tooltipRefs.current[2] = el; }}
-                                title="Brake" channel="brake" yLabel="Brake" height={180} showXAxis />
-                            <ChannelChart {...sharedProps}
-                                overlayRef={el => { crosshairRefs.current[3] = el; }}
-                                tooltipRef={el => { tooltipRefs.current[3] = el; }}
-                                title="RPM" channel="rpm" yLabel="RPM" height={250} showXAxis />
-                            <GearChart {...sharedProps}
-                                overlayRef={el => { crosshairRefs.current[4] = el; }}
-                                tooltipRef={el => { tooltipRefs.current[4] = el; }}
-                                title="Gear" height={220} showXAxis />
-                            <BinaryChart {...sharedProps}
-                                overlayRef={el => { crosshairRefs.current[5] = el; }}
-                                tooltipRef={el => { tooltipRefs.current[5] = el; }}
-                                title="DRS" channel="drs" yLabel="DRS" height={180} showXAxis />
-                        </div>
-                    )}
-                </div>
-            )}
+
+            <div className="relative">
+                {!isLoading && data && (
+                    <div className="relative">
+                        <ChannelChart {...sharedProps}
+                            overlayRef={el => { crosshairRefs.current[0] = el; }}
+                            tooltipRef={el => { tooltipRefs.current[0] = el; }}
+                            title="Speed" channel="speed" yLabel="km/h" height={420} showXAxis />
+                        <ChannelChart {...sharedProps}
+                            overlayRef={el => { crosshairRefs.current[1] = el; }}
+                            tooltipRef={el => { tooltipRefs.current[1] = el; }}
+                            title="Throttle" channel="throttle" yLabel="%" height={250} yDomain={[0, 100]} showXAxis />
+                        <BinaryChart {...sharedProps}
+                            overlayRef={el => { crosshairRefs.current[2] = el; }}
+                            tooltipRef={el => { tooltipRefs.current[2] = el; }}
+                            title="Brake" channel="brake" yLabel="Brake" height={180} showXAxis />
+                        <ChannelChart {...sharedProps}
+                            overlayRef={el => { crosshairRefs.current[3] = el; }}
+                            tooltipRef={el => { tooltipRefs.current[3] = el; }}
+                            title="RPM" channel="rpm" yLabel="RPM" height={250} showXAxis />
+                        <GearChart {...sharedProps}
+                            overlayRef={el => { crosshairRefs.current[4] = el; }}
+                            tooltipRef={el => { tooltipRefs.current[4] = el; }}
+                            title="Gear" height={220} showXAxis />
+                        <BinaryChart {...sharedProps}
+                            overlayRef={el => { crosshairRefs.current[5] = el; }}
+                            tooltipRef={el => { tooltipRefs.current[5] = el; }}
+                            title="DRS" channel="drs" yLabel="DRS" height={180} showXAxis />
+                    </div>
+                )}
+            </div>
 
             {!isLoading && !error && !data && (
                 <div className="flex items-center justify-center opacity-50 h-48">

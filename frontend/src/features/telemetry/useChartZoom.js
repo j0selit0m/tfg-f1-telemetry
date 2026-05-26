@@ -1,3 +1,8 @@
+// Hook que gestiona el zoom y pan de los gráficos de telemetría.
+// El dominio visible vive en estado React (re-renderiza los charts) y en
+// domainRef (lectura síncrona en handlers sin closures obsoletos).
+// Zoom: rueda del ratón centrada bajo el cursor. Pan: arrastre izquierdo.
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { PLOT_LEFT_OFFSET, PLOT_RIGHT_OFFSET } from './chartConstants';
 
