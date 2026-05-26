@@ -111,37 +111,24 @@ export default function TelemetryView({ filters }) {
         // 1) Mover las 6 líneas rojas
         crosshairRefs.current.forEach(ref => ref?.setPercent(pct));
 
-        // 2) Búsqueda binaria del valor más cercano POR PILOTO
-        const closestPerDriver = {};
-        for (const key of driverKeys) {
-            const arr = data.drivers[key]?.data;
-            if (!arr || !arr.length) continue;
-            let lo = 0, hi = arr.length - 1;
-            while (lo < hi) {
-                const mid = (lo + hi) >> 1;
-                if (arr[mid].distance < distance) lo = mid + 1;
-                else hi = mid;
-            }
-            closestPerDriver[key] = arr[lo];
-        }
+        // 2) Mapear canal → campo del DTO
+const FIELD = {
+    speed: 'speed', throttle: 'throttle', brake: 'brake',
+    rpm: 'rpm', gear: 'gear', drs: 'drsActive',
+};
 
-        // 3) Mapear canal → campo del DTO de telemetría
-        const FIELD = {
-            speed: 'speed', throttle: 'throttle', brake: 'brake',
-            rpm: 'rpm', gear: 'gear', drs: 'drsActive',
-        };
-
-        // 4) Actualizar los 6 tooltips
-        tooltipRefs.current.forEach((ref, i) => {
-            if (!ref) return;
-            const ch = CHART_CHANNELS[i];
-            const field = FIELD[ch];
-            const values = {};
-            for (const key of driverKeys) {
-                values[key] = closestPerDriver[key]?.[field];
-            }
-            ref.setData(distance, values);
-        });
+// 3) Actualizar tooltips con el punto más cercano
+tooltipRefs.current.forEach((ref, i) => {
+    if (!ref) return;
+    const field = FIELD[CHART_CHANNELS[i]];
+    const values = {};
+    for (const key of driverKeys) {
+        const arr = data.drivers[key]?.data;
+        const pt = arr?.find(p => p.distance >= distance) ?? arr?.at(-1);
+        values[key] = pt?.[field] ?? null;
+    }
+    ref.setData(distance, values);
+});
     }, [handleMouseMove, data, domain, driverKeys]);
 
     const handleChartMouseLeave = useCallback((e) => {
