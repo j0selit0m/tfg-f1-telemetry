@@ -9,7 +9,7 @@ import BinaryChart from './BinaryChart';
 import GearChart from './GearChart';
 import LapSelector from './LapSelector';
 
-import { PLOT_LEFT_OFFSET, PLOT_RIGHT_OFFSET } from './chartConstants';
+import { PLOT_LEFT_OFFSET, PLOT_RIGHT_OFFSET, CHART_HEIGHTS } from './chartConstants';
 
 const CHART_CHANNELS = ['speed', 'throttle', 'brake', 'rpm', 'gear', 'drs'];
 
@@ -242,27 +242,27 @@ export default function TelemetryView({ filters }) {
                         <ChannelChart {...sharedProps}
                             overlayRef={el => { crosshairRefs.current[0] = el; }}
                             tooltipRef={el => { tooltipRefs.current[0] = el; }}
-                            title="Speed" channel="speed" yLabel="km/h" height={420} showXAxis />
+                            title="Speed" channel="speed" yLabel="km/h" height={CHART_HEIGHTS.speed} showXAxis />
                         <ChannelChart {...sharedProps}
                             overlayRef={el => { crosshairRefs.current[1] = el; }}
                             tooltipRef={el => { tooltipRefs.current[1] = el; }}
-                            title="Throttle" channel="throttle" yLabel="%" height={250} yDomain={[0, 100]} showXAxis />
+                            title="Throttle" channel="throttle" yLabel="%" height={CHART_HEIGHTS.throttle} showXAxis yDomain={[0, 100]} />
                         <BinaryChart {...sharedProps}
                             overlayRef={el => { crosshairRefs.current[2] = el; }}
                             tooltipRef={el => { tooltipRefs.current[2] = el; }}
-                            title="Brake" channel="brake" yLabel="Brake" height={180} showXAxis />
+                            title="Brake" channel="brake" yLabel="Brake" height={CHART_HEIGHTS.brake} showXAxis />
                         <ChannelChart {...sharedProps}
                             overlayRef={el => { crosshairRefs.current[3] = el; }}
                             tooltipRef={el => { tooltipRefs.current[3] = el; }}
-                            title="RPM" channel="rpm" yLabel="RPM" height={250} showXAxis />
+                            title="RPM" channel="rpm" yLabel="RPM" height={CHART_HEIGHTS.rpm} showXAxis />
                         <GearChart {...sharedProps}
                             overlayRef={el => { crosshairRefs.current[4] = el; }}
                             tooltipRef={el => { tooltipRefs.current[4] = el; }}
-                            title="Gear" height={220} showXAxis />
+                            title="Gear" height={CHART_HEIGHTS.gear} showXAxis />
                         <BinaryChart {...sharedProps}
                             overlayRef={el => { crosshairRefs.current[5] = el; }}
                             tooltipRef={el => { tooltipRefs.current[5] = el; }}
-                            title="DRS" channel="drs" yLabel="DRS" height={180} showXAxis />
+                            title="DRS" channel="drs" yLabel="DRS" height={CHART_HEIGHTS.drs} showXAxis />
                     </div>
                 )}
             </div>
@@ -278,7 +278,7 @@ export default function TelemetryView({ filters }) {
             {/* ── Barra de controles de zoom ─────────────────────────────── */}
 
             {data && (
-                <div className="border-t border-gray-800 px-5 py-2 flex items-center justify-between text-xs font-mono">
+                <div className="border-t border-gray-800 px-5 py-2 flex items-center justify-between text-sm font-mono">
                     <div className="flex gap-5 text-gray-600">
                         <span><strong className="text-gray-500">Wheel</strong> → Zoom</span>
                         <span><strong className="text-gray-500">Drag</strong> → Pan</span>

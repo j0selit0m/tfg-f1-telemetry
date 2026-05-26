@@ -23,7 +23,7 @@ const ChannelChart = memo(function ChannelChart({
     return (
         <div className="border-b border-gray-800/60">
             <div className="px-5 pt-2">
-                <span className="text-gray-500 font-mono text-[10px] uppercase tracking-widest">{title}</span>
+                <span className="text-gray-500 font-mono text-[12px] uppercase tracking-widest">{title}</span>
             </div>
             <div className="relative">
                 <ChartWrapper height={height} {...interaction}>
