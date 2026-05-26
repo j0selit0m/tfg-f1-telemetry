@@ -79,7 +79,9 @@ export default function TelemetryView({ filters }) {
     const visibleData = useMemo(() => {
         if (!allMergedData.length) return [];
         const buf = (domain[1] - domain[0]) * 0.02;
-        return allMergedData.filter(d => d.distance >= domain[0] - buf && d.distance <= domain[1] + buf);
+        return allMergedData.filter(d =>
+            d.distance >= domain[0] - buf && d.distance <= domain[1] + buf
+        );
     }, [allMergedData, domain]);
 
     const handleLoad = useCallback(() => {

@@ -13,6 +13,7 @@ export function useChartZoom(maxDistance) {
     const [domainEnd, setDomainEnd] = useState(0);
     const domainRef = useRef({ start: 0, end: 0, max: 0 });
     const panRef = useRef({ active: false, startX: 0, startStart: 0, startEnd: 0 });
+    const rafRef = useRef(null);
 
     useEffect(() => {
         if (maxDistance > 0) {
@@ -60,7 +61,17 @@ export function useChartZoom(maxDistance) {
         const delta = e.deltaY > 0 ? 1 : -1;
         const newRange = Math.max(100, Math.min(max, range * (1 + delta * ZOOM_FACTOR)));
         const anchor = start + ratio * range;
-        applyDomain(anchor - ratio * newRange, anchor + (1 - ratio) * newRange);
+        const s = anchor - ratio * newRange;
+        const en = anchor + (1 - ratio) * newRange;
+
+        // Cancela el frame pendiente y programa uno nuevo.
+        // Varios eventos de rueda dentro del mismo frame (16 ms) colapsan
+        // en un único re-render de React en vez de uno por evento.
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        rafRef.current = requestAnimationFrame(() => {
+            applyDomain(s, en);
+            rafRef.current = null;
+        });
     }, [applyDomain]);
 
     const handleMouseDown = useCallback((e) => {
