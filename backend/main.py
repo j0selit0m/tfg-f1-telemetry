@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import CORS_ORIGINS
 from core.cache_config import setup_cache
-from routers import analysis_router, schedule_router, telemetry_router
+from routers import analysis_router, schedule_router, telemetry_router, track_router
 
 # ── Caché de FastF1 ───────────────────────────────────────────────────────────
 # Se inicializa al arrancar el servidor, antes de registrar ninguna ruta.
@@ -47,3 +47,4 @@ app.add_middleware(
 app.include_router(schedule_router)
 app.include_router(telemetry_router)
 app.include_router(analysis_router)
+app.include_router(track_router)
