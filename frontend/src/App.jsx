@@ -8,6 +8,7 @@ import LapDataGrid from './features/lapData';
 import SummaryStatistics from './features/summary';
 import StintAnalysis from './features/stints';
 import TelemetryView from './features/telemetry';
+import TrackMapView from './features/trackMap';
 
 // Registro declarativo de pestañas. Para añadir una vista nueva basta con importar
 // el componente y añadir un objeto aquí.
@@ -16,6 +17,7 @@ const TABS = [
   { id: 'session-summary', label: 'Session Summary', component: SummaryStatistics },
   { id: 'stint-analysis', label: 'Stint Analysis', component: StintAnalysis },
   { id: 'speed-telemetry', label: 'Telemetry', component: TelemetryView },
+  { id: 'track-map', label: 'Track Map', component: TrackMapView },
 ];
 
 export default function App() {

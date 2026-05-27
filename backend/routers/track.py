@@ -2,7 +2,7 @@
 Router de mapa de circuito.
 
 Endpoints:
-    GET /api/track/{year}/{event_name}/map → piloto más rápido por microsector
+    GET /api/track/{year}/{event_name}/map → comparativa de 25 microsectores
 """
 
 from fastapi import APIRouter, HTTPException, Path, Query
@@ -19,7 +19,7 @@ router = APIRouter(tags=["Track Map"])
 @router.get(
     "/api/track/{year}/{event_name}/map",
     response_model=TrackMapResponse,
-    summary="Comparativa de microsectores entre N pilotos",
+    summary="Comparativa de 25 microsectores entre N pilotos",
 )
 async def get_track_map(
     year: int = Path(..., ge=MIN_YEAR, le=MAX_YEAR, description="Temporada F1"),
@@ -29,14 +29,8 @@ async def get_track_map(
         description="2 o más pilotos de la misma sesión. Formato: PILOTO:SESION o PILOTO:SESION:VUELTA",
         examples={"default": {"value": "ALO:Race,SAI:Race"}},
     ),
-    n_sectors: int = Query(
-        default=25,
-        ge=5,
-        le=100,
-        description="Número de microsectores en que se divide el trazado (default 25)",
-    ),
 ) -> TrackMapResponse:
-    """Divide el trazado en N microsectores iguales de distancia y colorea
+    """Divide el trazado en 25 microsectores iguales de distancia y colorea
     cada uno con el piloto que lo recorrió en menor tiempo.
 
     Todos los pilotos deben pertenecer a la misma sesión.
@@ -64,6 +58,6 @@ async def get_track_map(
         )
 
     try:
-        return build_track_response(driver_configs, session, n_sectors=n_sectors)
+        return build_track_response(driver_configs, session)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))

@@ -19,6 +19,28 @@ class MicrosectorPoint(BaseModel):
     )
 
 
+class SectorTimeDTO(BaseModel):
+    """Tiempos de travesía de cada piloto en un microsector."""
+
+    sector_number: int = Field(..., description="Número de sector (1-based)")
+    fastest: str = Field(..., description="Abreviatura del piloto más rápido")
+    times: dict[str, float] = Field(
+        ..., description="Tiempo de travesía por piloto en milisegundos"
+    )
+
+
+class CornerPositionDTO(BaseModel):
+    """Posición de una curva del circuito, con rotación ya aplicada."""
+
+    number: int = Field(..., description="Número de curva")
+    letter: str = Field(..., description="Letra identificadora (ej: 'a' en curva 10a)")
+    x: float = Field(..., description="Coordenada X rotada [m]")
+    y: float = Field(..., description="Coordenada Y rotada [m]")
+    angle: float = Field(
+        ..., description="Ángulo hacia el exterior de la curva [grados]"
+    )
+
+
 class DriverLapInfo(BaseModel):
     """Metadatos de la vuelta usada para cada piloto."""
 
@@ -32,3 +54,5 @@ class TrackMapResponse(BaseModel):
     session: str
     drivers: list[DriverLapInfo]
     points: list[MicrosectorPoint]
+    sectors: list[SectorTimeDTO]
+    corners: list[CornerPositionDTO]

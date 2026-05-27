@@ -224,7 +224,7 @@ export default function TelemetryView({ filters }) {
 
 
             <div className="relative">
-                {!isLoading && data && (
+                {!isLoading  && !error && data && (
                     <div className="relative">
                         <ChannelChart {...sharedProps}
                             overlayRef={el => { crosshairRefs.current[0] = el; }}

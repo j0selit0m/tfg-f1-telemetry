@@ -3,15 +3,33 @@ Lógica de negocio del dominio de mapa de circuito.
 
 Función pública principal:
     build_track_response() → TrackMapResponse
+
+Metodología de microsectores
+-----------------------------
+El trazado se divide en N_SECTORS tramos usando RelativeDistance (0.0-1.0),
+la distancia normalizada sobre el total de la vuelta que provee FastF1.
+Los 25 límites de sector caen en 0/25, 1/25, ..., 25/25 para ambos pilotos,
+independientemente de la longitud absoluta del circuito.
+
+Para cada tramo se calcula el tiempo de travesía de cada piloto por
+interpolación lineal sobre la telemetría fusionada (car_data + pos_data).
+El piloto con menor tiempo en un tramo gana ese microsector.
 """
 
 import numpy as np
 import pandas as pd
 import fastf1
 
-from dtos.track_dto import DriverLapInfo, MicrosectorPoint, TrackMapResponse
+from dtos.track_dto import (
+    CornerPositionDTO,
+    DriverLapInfo,
+    MicrosectorPoint,
+    SectorTimeDTO,
+    TrackMapResponse,
+)
 
-_N_POINTS = 300  # puntos de renderizado SVG (independiente del nº de sectores)
+N_SECTORS = 25  # número de microsectores fijo para todos los circuitos
+_N_POINTS = 300  # puntos de renderizado SVG (independiente de N_SECTORS)
 
 
 # ── Helpers privados ──────────────────────────────────────────────────────────
@@ -46,72 +64,99 @@ def _get_lap(
 
 
 def _prepare_telemetry(lap: pd.Series) -> pd.DataFrame | None:
-    """Carga la telemetría fusionada con posición GPS y la limpia.
+    """Carga y limpia la telemetría fusionada (car_data + pos_data) de una vuelta.
 
-    Usa get_telemetry() que ya fusiona car_data + pos_data internamente.
-    Devuelve None si el circuito no tiene datos GPS ese año.
+    Devuelve None si el circuito no tiene datos de posición GPS ese año.
+    RelativeDistance debe ser estrictamente creciente para que np.interp sea válido.
     """
     try:
         tel = lap.get_telemetry()
     except Exception:
         return None
 
-    tel = tel.dropna(subset=["X", "Y", "Distance"]).copy()
+    required = ["X", "Y", "Distance", "RelativeDistance"]
+    tel = tel.dropna(subset=required).copy()
     if tel.empty:
         return None
 
-    # Distance debe ser estrictamente creciente para np.interp
-    tel = tel.sort_values("Distance").drop_duplicates(subset=["Distance"])
+    tel = tel.sort_values("RelativeDistance").drop_duplicates(
+        subset=["RelativeDistance"]
+    )
     return tel.reset_index(drop=True)
 
 
-def _interp_time(tel: pd.DataFrame, distances: np.ndarray) -> np.ndarray:
-    """Interpola el tiempo transcurrido [s] en los puntos de distancia dados."""
+def _interp_time_rel(tel: pd.DataFrame, rel_distances: np.ndarray) -> np.ndarray:
+    """Interpola el tiempo transcurrido [s] en los puntos de distancia relativa dados."""
     return np.interp(
-        distances,
-        tel["Distance"].values,
+        rel_distances,
+        tel["RelativeDistance"].values,
         tel["Time"].dt.total_seconds().values,
     )
 
 
 def _interp_xy(
-    tel: pd.DataFrame, distances: np.ndarray
+    tel: pd.DataFrame, rel_distances: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Interpola las coordenadas X/Y en los puntos de distancia dados."""
-    dist = tel["Distance"].values
+    """Interpola las coordenadas X/Y en los puntos de distancia relativa dados."""
+    rel = tel["RelativeDistance"].values
     return (
-        np.interp(distances, dist, tel["X"].values),
-        np.interp(distances, dist, tel["Y"].values),
+        np.interp(rel_distances, rel, tel["X"].values),
+        np.interp(rel_distances, rel, tel["Y"].values),
     )
 
 
-def _compute_sector_winners(
+def _compute_sectors(
     tels: list[pd.DataFrame],
-    d_min: float,
-    d_max: float,
-    n_sectors: int,
-) -> np.ndarray:
-    """Devuelve el índice del piloto más rápido en cada sector.
+) -> tuple[np.ndarray, np.ndarray]:
+    """Calcula los tiempos de travesía y el piloto más rápido en cada microsector.
 
-    Para cada sector calcula el tiempo de travesía de cada piloto
-    (tiempo en la frontera de salida − tiempo en la frontera de entrada)
-    y devuelve el índice del menor.
+    Divide [0.0, 1.0] en N_SECTORS tramos iguales usando RelativeDistance.
+    Los límites son exactamente 0/25, 1/25, ..., 25/25 para todos los pilotos,
+    lo que garantiza una comparación en los mismos puntos proporcionales del trazado.
 
     Args:
-        tels:      Lista de DataFrames de telemetría, uno por piloto.
-        d_min:     Distancia de inicio del rango común.
-        d_max:     Distancia de fin del rango común.
-        n_sectors: Número de sectores en que dividir el trazado.
+        tels: Telemetría limpia de cada piloto.
 
     Returns:
-        Array de shape (n_sectors,) con el índice del piloto ganador en cada sector.
+        sector_times       shape (n_drivers, N_SECTORS) en segundos.
+        fastest_per_sector shape (N_SECTORS,) con el índice del piloto ganador.
     """
-    boundaries = np.linspace(d_min, d_max, n_sectors + 1)
-    sector_times = np.zeros((len(tels), n_sectors))
+    boundaries = np.linspace(0.0, 1.0, N_SECTORS + 1)
+    sector_times = np.zeros((len(tels), N_SECTORS))
+
     for j, tel in enumerate(tels):
-        t_boundaries = _interp_time(tel, boundaries)
-        sector_times[j] = t_boundaries[1:] - t_boundaries[:-1]
-    return np.argmin(sector_times, axis=0)
+        t_at_boundaries = _interp_time_rel(tel, boundaries)
+        sector_times[j] = t_at_boundaries[1:] - t_at_boundaries[:-1]
+
+    fastest_per_sector = np.argmin(sector_times, axis=0)
+    return sector_times, fastest_per_sector
+
+
+def _build_corners(
+    session: fastf1.core.Session, rotation: float
+) -> list[CornerPositionDTO]:
+    """Extrae las curvas del circuito y aplica la rotación oficial."""
+    try:
+        corners = session.get_circuit_info().corners
+    except Exception:
+        return []
+
+    x_rot, y_rot = _apply_rotation(
+        corners["X"].values.astype(float),
+        corners["Y"].values.astype(float),
+        rotation,
+    )
+
+    return [
+        CornerPositionDTO(
+            number=int(row["Number"]),
+            letter=str(row["Letter"]).strip() if pd.notna(row["Letter"]) else "",
+            x=round(float(x_rot[i]), 2),
+            y=round(float(y_rot[i]), 2),
+            angle=round(float(row["Angle"]), 2),
+        )
+        for i, (_, row) in enumerate(corners.iterrows())
+    ]
 
 
 # ── Función pública ───────────────────────────────────────────────────────────
@@ -120,21 +165,23 @@ def _compute_sector_winners(
 def build_track_response(
     driver_configs: list[dict],
     session: fastf1.core.Session,
-    n_sectors: int = 25,
 ) -> TrackMapResponse:
     """Construye la comparativa de microsectores para N pilotos de la misma sesión.
+
+    El trazado se divide en N_SECTORS = 25 tramos iguales usando RelativeDistance
+    (0.0–1.0), siguiendo la misma metodología que Tracing Insights.
 
     Args:
         driver_configs: Lista producida por parse_drivers(). Todos deben ser
                         de la misma sesión (validado en el router).
         session:        Sesión de FastF1 ya cargada con telemetría.
-        n_sectors:      Número de sectores en que dividir el trazado (default 25).
 
     Returns:
-        TrackMapResponse con el trazado y el piloto más rápido en cada sector.
+        TrackMapResponse con trazado, microsectores coloreados, tiempos por
+        sector para el tooltip y posiciones de curvas.
 
     Raises:
-        ValueError: Si algún piloto no tiene vuelta o datos GPS válidos.
+        ValueError: Si algún piloto no tiene vuelta válida o datos GPS.
     """
     rotation = _get_rotation(session)
 
@@ -155,29 +202,42 @@ def build_track_response(
         laps.append(lap)
         codes.append(cfg["driver"])
 
-    # Rango de distancia común a todos los pilotos
-    d_min = max(t["Distance"].iloc[0] for t in tels)
-    d_max = min(t["Distance"].iloc[-1] for t in tels)
+    sector_times, fastest_per_sector = _compute_sectors(tels)
 
-    fastest_per_sector = _compute_sector_winners(tels, d_min, d_max, n_sectors)
+    # Puntos de renderizado SVG distribuidos uniformemente en [0.0, 1.0]
+    rel_distances = np.linspace(0.0, 1.0, _N_POINTS)
+    sector_width = 1.0 / N_SECTORS
 
-    distances = np.linspace(d_min, d_max, _N_POINTS)
-    sector_width = (d_max - d_min) / n_sectors
-
-    x_raw, y_raw = _interp_xy(tels[0], distances)
+    x_raw, y_raw = _interp_xy(tels[0], rel_distances)
     x_rot, y_rot = _apply_rotation(x_raw, y_raw, rotation)
 
-    points = []
-    for i in range(_N_POINTS):
-        sector_idx = min(int((distances[i] - d_min) / sector_width), n_sectors - 1)
-        points.append(
-            MicrosectorPoint(
-                x=round(float(x_rot[i]), 2),
-                y=round(float(y_rot[i]), 2),
-                distance=round(float(distances[i]), 1),
-                fastest=codes[int(fastest_per_sector[sector_idx])],
-            )
+    points = [
+        MicrosectorPoint(
+            x=round(float(x_rot[i]), 2),
+            y=round(float(y_rot[i]), 2),
+            distance=round(float(rel_distances[i]), 4),
+            fastest=codes[
+                int(
+                    fastest_per_sector[
+                        min(int(rel_distances[i] / sector_width), N_SECTORS - 1)
+                    ]
+                )
+            ],
         )
+        for i in range(_N_POINTS)
+    ]
+
+    sectors = [
+        SectorTimeDTO(
+            sector_number=s + 1,
+            fastest=codes[int(fastest_per_sector[s])],
+            times={
+                codes[j]: round(float(sector_times[j, s] * 1000), 1)
+                for j in range(len(codes))
+            },
+        )
+        for s in range(N_SECTORS)
+    ]
 
     return TrackMapResponse(
         session=driver_configs[0]["session"],
@@ -186,4 +246,6 @@ def build_track_response(
             for j in range(len(codes))
         ],
         points=points,
+        sectors=sectors,
+        corners=_build_corners(session, rotation),
     )
