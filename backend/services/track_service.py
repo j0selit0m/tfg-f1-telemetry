@@ -22,8 +22,8 @@ import fastf1
 
 from dtos.track_dto import (
     CornerPositionDTO,
-    DriverLapInfo,
-    MicrosectorPoint,
+    DriverLapInfoDTO,
+    MicrosectorPointDTO,
     SectorTimeDTO,
     TrackMapResponse,
 )
@@ -169,7 +169,7 @@ def build_track_response(
     """Construye la comparativa de microsectores para N pilotos de la misma sesión.
 
     El trazado se divide en N_SECTORS = 25 tramos iguales usando RelativeDistance
-    (0.0–1.0), siguiendo la misma metodología que Tracing Insights.
+    (0.0-1.0), siguiendo la misma metodología que Tracing Insights.
 
     Args:
         driver_configs: Lista producida por parse_drivers(). Todos deben ser
@@ -212,7 +212,7 @@ def build_track_response(
     x_rot, y_rot = _apply_rotation(x_raw, y_raw, rotation)
 
     points = [
-        MicrosectorPoint(
+        MicrosectorPointDTO(
             x=round(float(x_rot[i]), 2),
             y=round(float(y_rot[i]), 2),
             distance=round(float(rel_distances[i]), 4),
@@ -242,7 +242,7 @@ def build_track_response(
     return TrackMapResponse(
         session=driver_configs[0]["session"],
         drivers=[
-            DriverLapInfo(driver=codes[j], lap_number=int(laps[j]["LapNumber"]))
+            DriverLapInfoDTO(driver=codes[j], lap_number=int(laps[j]["LapNumber"]))
             for j in range(len(codes))
         ],
         points=points,

@@ -6,7 +6,7 @@ import DriverGrid from './DriverGrid';
 import DriverCard from './DriverCard';
 import FilterSelect from './FilterSelect';
 
-const AVAILABLE_YEARS = [2026, 2025, 2024, 2023, 2022, 2021, 2020];
+const AVAILABLE_YEARS = [2026, 2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018];
 
 export default function SidebarFilter({ onFilterReady }) {
     const {

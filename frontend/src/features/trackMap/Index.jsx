@@ -97,7 +97,7 @@ export default function TrackMapView({ filters }) {
             {/* Área principal */}
             <div className="flex-1 overflow-y-auto">
 
-                {isLoading && (
+                {isLoading && !error && (
                     <div className="flex flex-col items-center justify-center h-64">
                         <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin mb-4" />
                         <p className="text-red-600 font-mono text-lg uppercase tracking-widest animate-pulse">

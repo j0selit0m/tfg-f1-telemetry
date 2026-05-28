@@ -30,10 +30,12 @@ async def get_track_map(
         examples={"default": {"value": "ALO:Race,SAI:Race"}},
     ),
 ) -> TrackMapResponse:
-    """Divide el trazado en 25 microsectores iguales de distancia y colorea
-    cada uno con el piloto que lo recorrió en menor tiempo.
+    """Divide el trazado en 25 microsectores iguales en distancia relativa
+    y colorea cada uno con el piloto que lo recorrió en menor tiempo.
 
-    Todos los pilotos deben pertenecer a la misma sesión.
+    La división usa RelativeDistance (0.0–1.0), no distancia absoluta en metros,
+    por lo que cada microsector representa la misma fracción de vuelta
+    independientemente de la longitud del circuito.
     """
     try:
         driver_configs = parse_drivers(drivers)

@@ -16,7 +16,7 @@ from dtos.analysis_dto import (
     DriverSummaryDTO,
     SummaryResponseDTO,
 )
-from utils import format_timedelta
+from utils.formatting import format_timedelta
 
 
 # ── Helpers privados ──────────────────────────────────────────────────────────

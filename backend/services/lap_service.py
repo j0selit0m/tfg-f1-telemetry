@@ -9,7 +9,7 @@ import pandas as pd
 import fastf1
 
 from dtos.analysis_dto import LapDTO, LapRowDTO, LapsResponseDTO
-from utils import format_timedelta
+from utils.formatting import format_timedelta
 
 
 # ── Helpers privados ──────────────────────────────────────────────────────────

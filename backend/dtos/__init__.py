@@ -1,8 +1,8 @@
 from .schedule_dto import EventDTO, SessionDTO, DriverDTO, DriversResponseDTO
 from .telemetry_dto import (
-    TelemetryPoint,
-    CornerInfo,
-    DriverTelemetry,
+    TelemetryPointDTO,
+    CornerDistanceDTO,
+    DriverTelemetryDTO,
     TelemetryResponse,
 )
 from .analysis_dto import (
@@ -26,9 +26,9 @@ __all__ = [
     "DriverDTO",
     "DriversResponseDTO",
     # telemetry
-    "TelemetryPoint",
-    "CornerInfo",
-    "DriverTelemetry",
+    "TelemetryPointDTO",
+    "CornerDistanceDTO",
+    "DriverTelemetryDTO",
     "TelemetryResponse",
     # analysis
     "LapDTO",

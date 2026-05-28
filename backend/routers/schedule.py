@@ -18,7 +18,7 @@ from config import COMPOUNDS, MAX_YEAR, MIN_YEAR
 from core.compounds import get_compound_color
 from core.session_loader import load_session_metadata
 from dtos.schedule_dto import DriverDTO, DriversResponseDTO, EventDTO, SessionDTO
-from utils import lighten_color, normalize_hex
+from utils.formatting import lighten_color, normalize_hex
 
 router = APIRouter(tags=["Filtros"])
 

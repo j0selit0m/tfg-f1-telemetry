@@ -16,7 +16,7 @@ from dtos.analysis_dto import (
     StintEntryDTO,
     StintsResponseDTO,
 )
-from utils import format_timedelta
+from utils.formatting import format_timedelta
 
 
 # ── Helper privado ────────────────────────────────────────────────────────────

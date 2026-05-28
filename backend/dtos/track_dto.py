@@ -8,7 +8,7 @@ y el cliente React (vista de Track Map).
 from pydantic import BaseModel, Field
 
 
-class MicrosectorPoint(BaseModel):
+class MicrosectorPointDTO(BaseModel):
     """Un punto del trazado con el piloto más rápido en su microsector."""
 
     x: float = Field(..., description="Coordenada X rotada [m]")
@@ -41,7 +41,7 @@ class CornerPositionDTO(BaseModel):
     )
 
 
-class DriverLapInfo(BaseModel):
+class DriverLapInfoDTO(BaseModel):
     """Metadatos de la vuelta usada para cada piloto."""
 
     driver: str = Field(..., description="Código de 3 letras del piloto")
@@ -52,7 +52,7 @@ class TrackMapResponse(BaseModel):
     """Respuesta completa: trazado del circuito con microsectores coloreados."""
 
     session: str
-    drivers: list[DriverLapInfo]
-    points: list[MicrosectorPoint]
+    drivers: list[DriverLapInfoDTO]
+    points: list[MicrosectorPointDTO]
     sectors: list[SectorTimeDTO]
     corners: list[CornerPositionDTO]

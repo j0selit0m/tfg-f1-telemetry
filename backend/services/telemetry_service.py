@@ -9,9 +9,9 @@ import pandas as pd
 import fastf1
 
 from dtos.telemetry_dto import (
-    TelemetryPoint,
-    CornerInfo,
-    DriverTelemetry,
+    TelemetryPointDTO,
+    CornerDistanceDTO,
+    DriverTelemetryDTO,
     TelemetryResponse,
 )
 
@@ -19,9 +19,9 @@ from dtos.telemetry_dto import (
 # ── Helpers privados ──────────────────────────────────────────────────────────
 
 
-def _build_telemetry_point(row: pd.Series) -> TelemetryPoint:
+def _build_telemetry_point(row: pd.Series) -> TelemetryPointDTO:
     """Serializa una fila del DataFrame de car_data al DTO."""
-    return TelemetryPoint(
+    return TelemetryPointDTO(
         distance=round(float(row["Distance"]), 1),
         speed=int(row["Speed"]),
         throttle=round(float(row["Throttle"]), 1),
@@ -79,18 +79,18 @@ def parse_drivers(drivers_param: str) -> list[dict]:
     return configs
 
 
-def build_corners(session: fastf1.core.Session) -> list[CornerInfo]:
+def build_corners(session: fastf1.core.Session) -> list[CornerDistanceDTO]:
     """Extrae la información de curvas del circuito a partir de la sesión.
 
     Args:
         session: Sesión de FastF1 ya cargada.
 
     Returns:
-        Lista de CornerInfo ordenada por distancia.
+        Lista de CornerDistanceDTO ordenada por distancia.
     """
     circuit_info = session.get_circuit_info()
     return [
-        CornerInfo(
+        CornerDistanceDTO(
             number=int(row["Number"]),
             letter=str(row["Letter"]).strip() if pd.notna(row["Letter"]) else "",
             distance=round(float(row["Distance"]), 1),
@@ -115,7 +115,7 @@ def build_telemetry_response(
     first_session = next(iter(sessions.values()))
     corners = build_corners(first_session)
 
-    drivers_data: list[DriverTelemetry] = []
+    drivers_data: list[DriverTelemetryDTO] = []
     for config in driver_configs:
         driver_abbr = config["driver"]
         session = sessions[config["session"]]
@@ -128,7 +128,7 @@ def build_telemetry_response(
         lap_number = int(lap["LapNumber"])
 
         drivers_data.append(
-            DriverTelemetry(
+            DriverTelemetryDTO(
                 key=f"{driver_abbr}:{config['session']}:{lap_number}",
                 driver=driver_abbr,
                 session=config["session"],
