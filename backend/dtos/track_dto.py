@@ -13,7 +13,9 @@ class MicrosectorPointDTO(BaseModel):
 
     x: float = Field(..., description="Coordenada X rotada [m]")
     y: float = Field(..., description="Coordenada Y rotada [m]")
-    distance: float = Field(..., description="Distancia desde el inicio de vuelta [m]")
+    distance: float = Field(
+        ..., description="Distancia relativa desde el inicio de vuelta [0.0-1.0]"
+    )
     fastest: str = Field(
         ..., description="Abreviatura del piloto más rápido en este microsector"
     )

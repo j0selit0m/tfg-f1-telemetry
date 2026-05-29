@@ -12,7 +12,7 @@ import os
 
 # ── Rango de temporadas soportadas ────────────────────────────────────────────
 
-MIN_YEAR: int = 2018
+MIN_YEAR: int = 2020
 MAX_YEAR: int = 2026  # ⬅ actualizar al inicio de cada nueva temporada
 
 # ── Compuestos de neumáticos ──────────────────────────────────────────────────
