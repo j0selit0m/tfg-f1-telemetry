@@ -15,6 +15,7 @@ export function useTelemetry(filters, driverParam) {
             return;
         }
         const ctrl = new AbortController();
+        setData(null);
         setLoading(true);
         setError(null);
         fetchTelemetry(
@@ -23,7 +24,11 @@ export function useTelemetry(filters, driverParam) {
         )
             .then(setData)
             .catch(err => { if (err.name !== 'AbortError') setError(err.message ?? 'Error'); })
-            .finally(() => setLoading(false));
+            .finally(() => {
+                if (!ctrl.signal.aborted) {
+                    setLoading(false);
+                }
+            });
         return () => ctrl.abort();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filters?.year, filters?.round, driverParam]);

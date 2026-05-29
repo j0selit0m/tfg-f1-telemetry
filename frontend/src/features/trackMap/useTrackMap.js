@@ -16,6 +16,7 @@ export function useTrackMap(filters, driverParam) {
         }
 
         const ctrl = new AbortController();
+        setData(null);
         setLoading(true);
         setError(null);
 
@@ -25,7 +26,11 @@ export function useTrackMap(filters, driverParam) {
         )
             .then(setData)
             .catch(err => { if (err.name !== 'AbortError') setError(err.message ?? 'Error'); })
-            .finally(() => setLoading(false));
+            .finally(() => {
+                if (!ctrl.signal.aborted) {
+                    setLoading(false);
+                }
+            });
 
         return () => ctrl.abort();
         // eslint-disable-next-line react-hooks/exhaustive-deps
