@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { fetchTrackMap } from './service';
 
-export function useTrackMap(filters, driverParam, nSectors) {
+export function useTrackMap(filters, driverParam) {
     const [data, setData] = useState(null);
     const [isLoading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -20,7 +20,7 @@ export function useTrackMap(filters, driverParam, nSectors) {
         setError(null);
 
         fetchTrackMap(
-            { year: filters.year, round: filters.round, driverParam, nSectors },
+            { year: filters.year, round: filters.round, driverParam },
             ctrl.signal,
         )
             .then(setData)
@@ -29,7 +29,7 @@ export function useTrackMap(filters, driverParam, nSectors) {
 
         return () => ctrl.abort();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filters?.year, filters?.round, driverParam, nSectors]);
+    }, [filters?.year, filters?.round, driverParam]);
 
     return { data, isLoading, error };
 }

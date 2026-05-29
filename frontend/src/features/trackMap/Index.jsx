@@ -2,11 +2,10 @@
 // Sigue el mismo patrón que TelemetryView: rows → driverParam → fetch → render.
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import LapSelector from '../telemetry/LapSelector';
+import LapSelector from '../../components/LapSelector';
 import { useTrackMap } from './useTrackMap';
 import TrackMapSVG from './TrackMapSVG';
 
-const N_SECTORS = 25;
 
 const FALLBACK_COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7'];
 
@@ -39,7 +38,7 @@ export default function TrackMapView({ filters }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filters?.year, filters?.round, filters?.driver, filters?.session]);
 
-    const { data, isLoading, error } = useTrackMap(filters, driverParam, N_SECTORS);
+    const { data, isLoading, error } = useTrackMap(filters, driverParam);
 
     const handleLoad = useCallback(() => {
         const sessions = [...new Set(rows.map(r => r.session))];

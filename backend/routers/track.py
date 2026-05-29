@@ -33,7 +33,7 @@ async def get_track_map(
     """Divide el trazado en 25 microsectores iguales en distancia relativa
     y colorea cada uno con el piloto que lo recorrió en menor tiempo.
 
-    La división usa RelativeDistance (0.0–1.0), no distancia absoluta en metros,
+    La división usa RelativeDistance (0.0-1.0), no distancia absoluta en metros,
     por lo que cada microsector representa la misma fracción de vuelta
     independientemente de la longitud del circuito.
     """

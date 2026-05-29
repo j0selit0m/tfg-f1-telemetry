@@ -95,6 +95,7 @@ async def get_schedule(
             country=str(row["Country"]),
         )
         for _, row in schedule.iterrows()
+        if int(row["RoundNumber"]) > 0 # Solo GPs oficiales, no sesiones de pretemporada
     ]
 
 

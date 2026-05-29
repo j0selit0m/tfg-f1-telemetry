@@ -7,7 +7,7 @@ import { useChartZoom } from './useChartZoom';
 import ChannelChart from './ChannelChart';
 import BinaryChart from './BinaryChart';
 import GearChart from './GearChart';
-import LapSelector from './LapSelector';
+import LapSelector from '../../components/LapSelector';
 
 import { PLOT_LEFT_OFFSET, PLOT_RIGHT_OFFSET, CHART_HEIGHTS } from './chartConstants';
 

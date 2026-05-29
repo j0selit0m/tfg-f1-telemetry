@@ -266,17 +266,17 @@ def test_car_telemetry(session: fastf1.core.Session) -> None:
     print(f"\nget_car_data().add_distance()  shape={car.shape}")
     print("Columnas y rangos:")
     print(
-        f"  Distance  (float)  {car['Distance'].min():.0f} – {car['Distance'].max():.0f} m"
+        f"  Distance  (float)  {car['Distance'].min():.0f} - {car['Distance'].max():.0f} m"
     )
     print(
-        f"  Speed     (float)  {car['Speed'].min():.0f} – {car['Speed'].max():.0f} km/h"
+        f"  Speed     (float)  {car['Speed'].min():.0f} - {car['Speed'].max():.0f} km/h"
     )
     print(
-        f"  Throttle  (float)  {car['Throttle'].min():.0f} – {car['Throttle'].max():.0f} %"
+        f"  Throttle  (float)  {car['Throttle'].min():.0f} - {car['Throttle'].max():.0f} %"
     )
     print(f"  Brake     (bool)   valores únicos: {sorted(car['Brake'].unique())}")
-    print(f"  RPM       (float)  {car['RPM'].min():.0f} – {car['RPM'].max():.0f}")
-    print(f"  nGear     (int)    {car['nGear'].min()} – {car['nGear'].max()}")
+    print(f"  RPM       (float)  {car['RPM'].min():.0f} - {car['RPM'].max():.0f}")
+    print(f"  nGear     (int)    {car['nGear'].min()} - {car['nGear'].max()}")
     print(f"  DRS       (int)    valores únicos: {sorted(car['DRS'].unique())}")
     print(
         f"\nFrecuencia: {len(car)} samples en {car['Time'].iloc[-1].total_seconds():.1f}s"
