@@ -67,7 +67,7 @@ export default function TrackMapView({ filters }) {
                     Track Map Standby
                 </h2>
                 <p className="text-sm font-mono text-gray-600 mt-2">
-                    Select parameters in the side panel.
+                    Select parameters and drivers in the side panel to start the analysis.
                 </p>
             </div>
         );

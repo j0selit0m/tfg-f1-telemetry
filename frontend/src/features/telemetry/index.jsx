@@ -159,7 +159,9 @@ export default function TelemetryView({ filters }) {
         return (
             <div className="flex items-center justify-center flex-col opacity-50 h-64">
                 <h2 className="text-2xl font-black italic uppercase tracking-widest text-gray-500">Telemetry Standby</h2>
-                <p className="text-sm font-mono text-gray-600 mt-2">Select parameters in the side panel.</p>
+                <p className="text-sm font-mono text-gray-600 mt-2">
+                    Select parameters and drivers in the side panel to start the analysis.
+                </p>
             </div>
         );
     }
@@ -224,7 +226,7 @@ export default function TelemetryView({ filters }) {
 
 
             <div className="relative">
-                {!isLoading  && !error && data && (
+                {!isLoading && !error && data && (
                     <div className="relative">
                         <ChannelChart {...sharedProps}
                             overlayRef={el => { crosshairRefs.current[0] = el; }}

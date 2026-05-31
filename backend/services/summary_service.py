@@ -86,8 +86,11 @@ def _build_driver_summary(
     if best_lap is None:
         return None
 
-    consistency = round((1 - std_s / mean_s) * 100, 2) if mean_s > 0 else 0.0
-
+    consistency = (
+        round((1 - std_s / mean_s) * 100, 2)
+        if mean_s > 0 and pd.notna(std_s)
+        else 100.0  # con una sola vuelta no hay dispersión -> consistencia perfecta
+    )
     return DriverSummaryDTO(
         best_lap=BestLapDTO(
             time=format_timedelta(best_lap["LapTime"]),

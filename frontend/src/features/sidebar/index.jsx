@@ -94,9 +94,9 @@ function Branding() {
             <div className="w-10 h-10 border border-gray-600 border-dashed rounded-sm flex items-center justify-center shrink-0">
                 <span className="text-xs font-black text-gray-600">PW</span>
             </div>
-            <h2 className="text-3xl font-extrabold italic uppercase tracking-wider text-white drop-shadow-md leading-none">
-                <span className="text-white">PIT</span>
-                <span className="text-red-600">WALL</span>
+            <h2 className="text-5xl font-extrabold italic tracking-wider text-white drop-shadow-md leading-none">
+                <span className="text-white">Pit</span>
+                <span className="text-red-600">Wall</span>
             </h2>
         </div>
     );

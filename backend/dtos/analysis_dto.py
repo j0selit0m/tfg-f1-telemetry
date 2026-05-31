@@ -33,7 +33,8 @@ class LapDTO(BaseModel):
         None, description="Posición en pista al finalizar la vuelta"
     )
     track_status: str | None = Field(
-        None, description="1=verde · 2=VSC · 4=SC · 5=roja"
+        None,
+        description="1=clear · 2=yellow · 4=SC · 5=red flag · 6=VSC · 7=VSC ending",
     )
     is_personal_best: bool = Field(
         ...,

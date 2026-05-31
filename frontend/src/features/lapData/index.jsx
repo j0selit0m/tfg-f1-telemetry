@@ -176,13 +176,19 @@ function Legend({ filters }) {
                                 <span className="w-2 h-2 bg-green-500 shadow-[0_0_4px_#22c55e] rounded-full mr-2" /> Clear
                             </span>
                             <span className="flex items-center text-sm font-mono text-gray-300">
+                                <span className="w-2 h-2 bg-yellow-500 shadow-[0_0_4px_#eab308] rounded-full mr-2" /> Yellow Flag
+                            </span>
+                            <span className="flex items-center text-sm font-mono text-gray-300">
                                 <span className="w-2 h-2 bg-orange-500 shadow-[0_0_4px_#f97316] rounded-full mr-2" /> Safety Car
                             </span>
                             <span className="flex items-center text-sm font-mono text-gray-300">
-                                <span className="w-2 h-2 bg-red-600 shadow-[0_0_4px_#dc2626] rounded-full mr-2" /> Red Flag
+                                <span className="w-2 h-2 bg-red-500 shadow-[0_0_4px_#ef4444] rounded-full mr-2" /> Red Flag
                             </span>
                             <span className="flex items-center text-sm font-mono text-gray-300">
-                                <span className="w-2 h-2 border-2 border-orange-400 rounded-full bg-transparent mr-2" /> Virtual SC
+                                <span className="w-2 h-2 bg-purple-500 shadow-[0_0_4px_#a855f7] rounded-full mr-2" /> Virtual SC
+                            </span>
+                            <span className="flex items-center text-sm font-mono text-gray-300">
+                                <span className="w-2 h-2 bg-cyan-500 shadow-[0_0_4px_#06b6d4] rounded-full animate-pulse mr-2" /> VSC Ending
                             </span>
                         </div>
                     </div>

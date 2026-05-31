@@ -74,7 +74,9 @@ def _build_stint_driver(
     )
 
     consistency = (
-        round((1 - std_s / mean_s) * 100, 1) if mean_s > 0 and pd.notna(std_s) else None
+        round((1 - std_s / mean_s) * 100, 1)
+        if mean_s > 0 and pd.notna(std_s)
+        else 100.0  # con una sola vuelta no hay dispersión -> consistencia perfecta
     )
 
     return StintDriverDTO(

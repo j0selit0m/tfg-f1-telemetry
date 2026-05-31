@@ -4,21 +4,31 @@
 const COMPOUND_LETTERS = { SOFT: 'S', MEDIUM: 'M', HARD: 'H', INTERMEDIATE: 'I', WET: 'W' };
 
 // LEDs de color para cada código de estado de pista.
-// Códigos: "1" = verde · "2" = VSC · "4" = SC · "5" = bandera roja
+// Códigos según la API oficial de FastF1:
+//   '1' = Track clear       → verde
+//   '2' = Yellow flag       → amarillo
+//   '4' = Safety Car        → naranja sólido
+//   '5' = Red Flag          → rojo
+//   '6' = VSC deployed      → morado
+//   '7' = VSC ending        → cyan parpadeante
 function TrackStatusDots({ trackStatus }) {
     if (!trackStatus) return null;
 
     const statusStyles = {
         '1': 'bg-green-500 shadow-[0_0_4px_#22c55e]',
-        '2': 'border border-orange-400 bg-transparent',
+        '2': 'bg-yellow-500 shadow-[0_0_4px_#eab308]',
         '4': 'bg-orange-500 shadow-[0_0_4px_#f97316]',
-        '5': 'bg-red-600 shadow-[0_0_4px_#dc2626]',
+        '5': 'bg-red-500 shadow-[0_0_4px_#ef4444]',
+        '6': 'bg-purple-500 shadow-[0_0_4px_#a855f7]',
+        '7': 'bg-cyan-500 shadow-[0_0_4px_#06b6d4] animate-pulse',
     };
     const statusLabels = {
         '1': 'Track Clear',
-        '2': 'Virtual Safety Car',
+        '2': 'Yellow Flag',
         '4': 'Safety Car',
         '5': 'Red Flag',
+        '6': 'Virtual Safety Car',
+        '7': 'Virtual Safety Car Ending',
     };
 
     return (
@@ -77,15 +87,14 @@ function DriverCell({ entry, prevEntry, filters }) {
                 <div className="flex justify-between items-center">
                     <div className="flex items-center gap-1.5">
                         <span className={`text-xs px-2 py-1 rounded-sm font-bold border ${entry.position === 1 ? 'bg-yellow-900/40 border-yellow-500 text-yellow-400' :
-                                entry.position === 2 ? 'bg-gray-500/20 border-gray-400 text-gray-300' :
-                                    entry.position === 3 ? 'bg-orange-900/30 border-orange-600 text-orange-400' :
-                                        'bg-gray-800 border-gray-700 text-gray-400'
+                            entry.position === 2 ? 'bg-gray-500/20 border-gray-400 text-gray-300' :
+                                entry.position === 3 ? 'bg-orange-900/30 border-orange-600 text-orange-400' :
+                                    'bg-gray-800 border-gray-700 text-gray-400'
                             }`}>
                             P{entry.position}
                         </span>
                         {posDelta > 0 && <span className="text-[11px] font-black text-green-500">▲{posDelta}</span>}
                         {posDelta < 0 && <span className="text-[11px] font-black text-red-500">▼{Math.abs(posDelta)}</span>}
-                        {posDelta === 0 && prevEntry && <span className="text-[11px] font-bold text-gray-600">-</span>}
                     </div>
 
                     <div className="flex items-center gap-2">
