@@ -26,7 +26,7 @@ export default function StintAnalysis({ filters }) {
     return (
         <div className="flex flex-col h-full w-full bg-[#0a0a0c] border border-gray-800 shadow-2xl font-sans text-gray-200">
 
-            {/* ── Banner de error ────────────────────────────────────────── */}
+            {/* --- Banner de error --- */}
 
             {error && !isLoading && (
                 <div className="flex items-center gap-3 border-b border-red-900/60 bg-red-950/20 px-5 py-3 shrink-0">
@@ -41,7 +41,7 @@ export default function StintAnalysis({ filters }) {
                 </div>
             )}
 
-            {/* ── Tabla ──────────────────────────────────────────────────── */}
+            {/* --- Tabla --- */}
 
             <div className="flex-1 overflow-auto relative pt-4">
 

@@ -10,12 +10,12 @@ Actualizar MAX_YEAR al inicio de cada temporada.
 
 import os
 
-# ── Rango de temporadas soportadas ────────────────────────────────────────────
+# Rango de temporadas soportadas
 
 MIN_YEAR: int = 2020
-MAX_YEAR: int = 2026  # ⬅ actualizar al inicio de cada nueva temporada
+MAX_YEAR: int = 2026  # actualizar al inicio de cada nueva temporada
 
-# ── Compuestos de neumáticos ──────────────────────────────────────────────────
+#  Compuestos de neumáticos
 
 COMPOUNDS: list[str] = ["SOFT", "MEDIUM", "HARD", "INTERMEDIATE", "WET"]
 
@@ -37,7 +37,7 @@ COMPOUND_FALLBACK_COLORS: dict[str, str] = {
     "WET": "#0067ff",
 }
 
-# ── Rutas de caché de FastF1 ──────────────────────────────────────────────────
+# ---- Rutas de caché de FastF1 ---
 #
 # Configurables vía variables de entorno (.env). Si no se definen, se usan los
 # valores por defecto. La selección entre HDD y local se hace dinámicamente en
@@ -46,7 +46,7 @@ COMPOUND_FALLBACK_COLORS: dict[str, str] = {
 CACHE_HDD_PATH: str = os.getenv("FASTF1_CACHE_HDD_PATH", "E:\\TFG_F1_Cache")
 CACHE_LOCAL_PATH: str = os.getenv("FASTF1_CACHE_LOCAL_PATH", "fastf1_cache_local")
 
-# ── CORS ──────────────────────────────────────────────────────────────────────
+# ---- CORS ----
 #
 # Orígenes permitidos para peticiones cross-origin desde el frontend.
 # Separados por comas en la variable de entorno CORS_ORIGINS.

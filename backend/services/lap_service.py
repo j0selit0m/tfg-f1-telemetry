@@ -12,7 +12,7 @@ from dtos.analysis_dto import LapDTO, LapRowDTO, LapsResponseDTO
 from utils.formatting import format_timedelta
 
 
-# ── Helpers privados ──────────────────────────────────────────────────────────
+# --- Helpers privados ---
 
 
 def _build_lap_dto(lap: pd.Series) -> LapDTO:
@@ -42,7 +42,7 @@ def _build_lap_dto(lap: pd.Series) -> LapDTO:
     )
 
 
-# ── Función pública ───────────────────────────────────────────────────────────
+# --- Función pública ---
 
 
 def build_laps_response(

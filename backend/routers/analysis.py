@@ -19,7 +19,7 @@ from services.summary_service import build_summary_response
 router = APIRouter(tags=["Análisis"])
 
 
-# ── Parámetros de ruta compartidos ────────────────────────────────────────────
+# --- Parámetros de ruta compartidos ---
 #
 # Las tres rutas comparten el mismo prefijo y los mismos path params.
 # Se definen aquí para no repetir las descripciones en cada endpoint.

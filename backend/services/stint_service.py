@@ -19,7 +19,7 @@ from dtos.analysis_dto import (
 from utils.formatting import format_timedelta
 
 
-# ── Helper privado ────────────────────────────────────────────────────────────
+# --- Helper privado ---
 
 
 def _build_stint_driver(
@@ -92,7 +92,7 @@ def _build_stint_driver(
     )
 
 
-# ── Función pública ───────────────────────────────────────────────────────────
+# --- Función pública ---
 
 
 def build_stints_response(

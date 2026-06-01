@@ -22,12 +22,12 @@ from routers.telemetry import router as telemetry_router
 from routers.analysis import router as analysis_router
 from routers.track import router as track_router
 
-# ── Caché de FastF1 ───────────────────────────────────────────────────────────
+# --- Caché de FastF1 ---
 # Se inicializa al arrancar el servidor, antes de registrar ninguna ruta.
 
 setup_cache()
 
-# ── Aplicación ────────────────────────────────────────────────────────────────
+# --- Aplicación ---
 
 app = FastAPI(
     title="TFG Formula 1 API",
@@ -35,7 +35,7 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# ── CORS ──────────────────────────────────────────────────────────────────────
+# --- CORS ---
 # Autoriza el tráfico del cliente React local (puerto 5173).
 
 app.add_middleware(
@@ -46,7 +46,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Routers ───────────────────────────────────────────────────────────────────
+# --- Routers ---
 
 app.include_router(schedule_router)
 app.include_router(telemetry_router)

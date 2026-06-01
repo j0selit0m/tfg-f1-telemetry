@@ -25,7 +25,7 @@ export default function SummaryStatistics({ filters }) {
     return (
         <div className="flex flex-col h-full w-full bg-[#0a0a0c] border border-gray-800 shadow-2xl font-sans text-gray-200">
 
-            {/* ── Banner de error ────────────────────────────────────────── */}
+            {/* --- Banner de error --- */}
 
             {error && !isLoading && (
                 <div className="flex items-center gap-3 border-b border-red-900/60 bg-red-950/20 px-5 py-3 shrink-0">
@@ -40,7 +40,7 @@ export default function SummaryStatistics({ filters }) {
                 </div>
             )}
 
-            {/* ── Loading ────────────────────────────────────────────────── */}
+            {/* --- Loading --- */}
 
             {isLoading && (
                 <div className="absolute inset-0 z-20 bg-[#0a0a0c]/80 backdrop-blur-sm flex flex-col items-center justify-center">
@@ -51,7 +51,7 @@ export default function SummaryStatistics({ filters }) {
                 </div>
             )}
 
-            {/* ── Grid de tarjetas ───────────────────────────────────────── */}
+            {/* --- Grid de tarjetas --- */}
 
             <div className="flex-1 overflow-y-auto relative">
                 <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">

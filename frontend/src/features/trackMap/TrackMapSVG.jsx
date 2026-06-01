@@ -87,9 +87,9 @@ export default function TrackMapSVG({ data, colorMap }) {
         return { sectorsWon: won, lapTimesMs: times };
     }, [data]);
 
-    // Mapa driver → lap_number para el tooltip, extraído del DTO
+    // Mapa driver → lapNumber para el tooltip, extraído del DTO
     const driverLaps = useMemo(() =>
-        Object.fromEntries(data.drivers.map(d => [d.driver, d.lap_number])),
+        Object.fromEntries(data.drivers.map(d => [d.driver, d.lapNumber])),
         [data.drivers]
     );
 
@@ -121,7 +121,7 @@ export default function TrackMapSVG({ data, colorMap }) {
                                 <DriverBadge
                                     driver={d.driver}
                                     color={colorMap[d.driver] ?? '#9ca3af'}
-                                    lap={d.lap_number}
+                                    lap={d.lapNumber}
                                     sectors={sectorsWon[d.driver] ?? 0}
                                     lapTime={formatLapTime(lapTimesMs[d.driver] ?? 0)}
                                 />

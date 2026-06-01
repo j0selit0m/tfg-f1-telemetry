@@ -8,7 +8,7 @@ y el cliente React (vistas de Análisis).
 from pydantic import BaseModel, Field
 
 
-# ── Laps ──────────────────────────────────────────────────────────────────────
+# --- Laps ---
 
 
 class LapDTO(BaseModel):
@@ -68,7 +68,7 @@ class LapsResponseDTO(BaseModel):
     laps: list[LapRowDTO]
 
 
-# ── Summary ───────────────────────────────────────────────────────────────────
+# --- Summary ---
 
 
 class BestLapDTO(BaseModel):
@@ -114,7 +114,7 @@ class SummaryResponseDTO(BaseModel):
     )
 
 
-# ── Stints ────────────────────────────────────────────────────────────────────
+# --- Stints ---
 
 
 class StintBestLapDTO(BaseModel):

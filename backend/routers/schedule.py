@@ -23,7 +23,7 @@ from utils.formatting import lighten_color, normalize_hex
 router = APIRouter(tags=["Filtros"])
 
 
-# ── Helper privado ────────────────────────────────────────────────────────────
+# --- Helper privado ---
 
 
 def _build_driver_list(session: fastf1.core.Session) -> list[DriverDTO]:
@@ -65,7 +65,7 @@ def _build_driver_list(session: fastf1.core.Session) -> list[DriverDTO]:
     return sorted(drivers, key=lambda d: d.abbreviation)
 
 
-# ── Endpoints ─────────────────────────────────────────────────────────────────
+# --- Endpoints ---
 
 
 @router.get(

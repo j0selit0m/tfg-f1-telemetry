@@ -169,9 +169,9 @@ export default function TelemetryView({ filters }) {
     return (
         <div className="flex flex-col w-full bg-[#0a0a0c] border border-gray-800 shadow-2xl font-sans text-gray-200">
 
-            {/* ── Cabecera ───────────────────────────────────────────────── */}
+            {/* --- Cabecera --- */}
 
-            {/* ── Selector de vueltas ───────────────────────────────────── */}
+            {/* --- Selector de vueltas --- */}
             <div className="bg-[#111318] border-b border-gray-800 px-5 py-3 flex items-center gap-4 shrink-0 flex-wrap">
                 <LapSelector
                     rows={rows}
@@ -183,7 +183,7 @@ export default function TelemetryView({ filters }) {
                 />
             </div>
 
-            {/* ── Leyenda de pilotos ─────────────────────────────────────── */}
+            {/* --- Leyenda de pilotos --- */}
 
             {data && (
                 <div className="flex flex-wrap gap-6 px-5 py-2 border-b border-gray-800 bg-black/40">
@@ -202,7 +202,7 @@ export default function TelemetryView({ filters }) {
                 </div>
             )}
 
-            {/* ── Error ──────────────────────────────────────────────────── */}
+            {/* --- Error --- */}
 
             {error && !isLoading && (
                 <div className="flex items-center gap-3 border-b border-red-900/60 bg-red-950/20 px-5 py-3">
@@ -211,7 +211,7 @@ export default function TelemetryView({ filters }) {
                 </div>
             )}
 
-            {/* ── Loading ────────────────────────────────────────────────── */}
+            {/* --- Loading --- */}
 
             {isLoading && (
                 <div className="flex flex-col items-center justify-center h-64">
@@ -222,7 +222,7 @@ export default function TelemetryView({ filters }) {
                 </div>
             )}
 
-            {/* ── Gráficos ───────────────────────────────────────────────── */}
+            {/* --- Gráficos --- */}
 
 
             <div className="relative">
@@ -264,7 +264,7 @@ export default function TelemetryView({ filters }) {
                 </div>
             )}
 
-            {/* ── Barra de controles de zoom ─────────────────────────────── */}
+            {/* --- Barra de controles de zoom --- */}
 
             {data && (
                 <div className="border-t border-gray-800 px-5 py-2 flex items-center justify-between text-sm font-mono">

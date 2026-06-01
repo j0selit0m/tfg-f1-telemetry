@@ -64,7 +64,7 @@ export default function App() {
   );
 }
 
-// ── Sub-componentes ───────────────────────────────────────────────────────────
+// --- Sub-componentes ---
 
 // Muestra el contexto de la sesión activa cuando hay filtros aplicados.
 function Header({ filters }) {

@@ -15,14 +15,14 @@ sin reutilizar la incompleta.
 import asyncio
 import fastf1
 
-# ── Cachés independientes por tipo de carga ───────────────────────────────────
+# --- Cachés independientes por tipo de carga ---
 
 # Clave: "{year}_{event_name}_{session_name}"
 _metadata_cache: dict[str, fastf1.core.Session] = {}
 _telemetry_cache: dict[str, fastf1.core.Session] = {}
 
 
-# ── Loaders ───────────────────────────────────────────────────────────────────
+# --- Loaders ---
 
 
 async def load_session_metadata(

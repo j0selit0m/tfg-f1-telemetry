@@ -27,7 +27,7 @@ export default function LapDataGrid({ filters }) {
 
             <Legend filters={filters} />
 
-            {/* ── Estados de carga, error y vacío ───────────────────────── */}
+            {/* --- Estados de carga, error y vacío --- */}
 
             <div className="flex-1 overflow-auto bg-[#0a0a0c] relative">
 
@@ -62,7 +62,7 @@ export default function LapDataGrid({ filters }) {
                     </div>
                 )}
 
-                {/* ── Tabla principal ────────────────────────────────────── */}
+                {/* --- Tabla principal --- */}
 
                 {!isLoading && data && data.laps.length > 0 && (
                     <table className="w-full text-left border-collapse">
@@ -107,7 +107,7 @@ export default function LapDataGrid({ filters }) {
     );
 }
 
-// ── Sub-componentes ───────────────────────────────────────────────────────────
+// --- Sub-componentes ---
 
 // Leyenda colapsable con los iconos y códigos de color usados en la tabla.
 function Legend({ filters }) {

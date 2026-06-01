@@ -19,7 +19,7 @@ from dtos.analysis_dto import (
 from utils.formatting import format_timedelta
 
 
-# ── Helpers privados ──────────────────────────────────────────────────────────
+# --- Helpers privados ---
 
 
 def _build_strategy(
@@ -107,7 +107,7 @@ def _build_driver_summary(
     )
 
 
-# ── Función pública ───────────────────────────────────────────────────────────
+# --- Función pública ---
 
 
 def build_summary_response(

@@ -32,7 +32,7 @@ N_SECTORS = 25  # número de microsectores fijo para todos los circuitos
 _N_POINTS = 300  # puntos de renderizado SVG (independiente de N_SECTORS)
 
 
-# ── Helpers privados ──────────────────────────────────────────────────────────
+# --- Helpers privados ---
 
 
 def _get_rotation(session: fastf1.core.Session) -> float:
@@ -159,7 +159,7 @@ def _build_corners(
     ]
 
 
-# ── Función pública ───────────────────────────────────────────────────────────
+# --- Función pública ---
 
 
 def build_track_response(

@@ -25,11 +25,11 @@ def setup_cache() -> str:
     if _hdd_available(CACHE_HDD_PATH):
         os.makedirs(CACHE_HDD_PATH, exist_ok=True)
         path = CACHE_HDD_PATH
-        print(f"✅ Caché FastF1 en HDD: {path}")
+        print(f"Caché FastF1 en HDD: {path}")
     else:
         os.makedirs(CACHE_LOCAL_PATH, exist_ok=True)
         path = CACHE_LOCAL_PATH
-        print(f"⚠️  HDD no detectado. Caché local: {path}")
+        print(f"HDD no detectado. Caché local: {path}")
 
     fastf1.Cache.enable_cache(path)
     return path

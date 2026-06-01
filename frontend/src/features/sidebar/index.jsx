@@ -86,7 +86,7 @@ export default function SidebarFilter({ onFilterReady }) {
     );
 }
 
-// ── Sub-componentes ───────────────────────────────────────────────────────────
+// --- Sub-componentes ---
 
 function Branding() {
     return (

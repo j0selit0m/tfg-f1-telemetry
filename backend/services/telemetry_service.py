@@ -16,7 +16,7 @@ from dtos.telemetry_dto import (
 )
 
 
-# ── Helpers privados ──────────────────────────────────────────────────────────
+# --- Helpers privados ---
 
 
 def _build_telemetry_point(row: pd.Series) -> TelemetryPointDTO:
@@ -43,7 +43,7 @@ def _get_lap(
     return driver_laps.pick_fastest(only_by_time=True)
 
 
-# ── Funciones públicas ────────────────────────────────────────────────────────
+# --- Funciones públicas ---
 
 
 def parse_drivers(drivers_param: str) -> list[dict]:
