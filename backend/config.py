@@ -10,6 +10,9 @@ Actualizar MAX_YEAR al inicio de cada temporada.
 
 import os
 
+from dotenv import load_dotenv
+load_dotenv()
+
 # Rango de temporadas soportadas
 
 MIN_YEAR: int = 2020
@@ -59,3 +62,11 @@ CORS_ORIGINS: list[str] = [
     ).split(",")
     if origin.strip()
 ]
+
+# ---- Gemini (Análisis con IA) ----
+#
+# API key y modelo de Google Gemini para el módulo de análisis inteligente.
+# La key se obtiene en https://aistudio.google.com/apikey (plan gratuito).
+
+GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")

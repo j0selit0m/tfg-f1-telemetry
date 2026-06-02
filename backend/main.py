@@ -21,6 +21,7 @@ from routers.schedule import router as schedule_router
 from routers.telemetry import router as telemetry_router
 from routers.analysis import router as analysis_router
 from routers.track import router as track_router
+from routers.ai import router as ai_router
 
 # --- Caché de FastF1 ---
 # Se inicializa al arrancar el servidor, antes de registrar ninguna ruta.
@@ -52,3 +53,4 @@ app.include_router(schedule_router)
 app.include_router(telemetry_router)
 app.include_router(analysis_router)
 app.include_router(track_router)
+app.include_router(ai_router)

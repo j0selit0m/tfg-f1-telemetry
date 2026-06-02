@@ -1,13 +1,42 @@
 // Orquestador de la vista de resumen de sesión. Consume useSessionSummary
 // y renderiza una tarjeta por piloto seleccionado.
+// Integra el módulo de análisis con IA mediante el botón y panel dedicados.
 
+import { useCallback } from 'react';
 import { useSessionSummary } from './useSessionSummary';
+import { useAiAnalysis } from '../../hooks/useAiAnalysis';
 import DriverCard from './DriverCard';
+import AiInsightPanel from '../../components/AiInsightPanel';
 
 export default function SummaryStatistics({ filters }) {
     const { data, isLoading, error, refetch } = useSessionSummary(filters);
+    const ai = useAiAnalysis('/ai/summary-analysis');
 
     const fastestCode = data?.fastestDriver?.driverCode ?? null;
+
+    // Empaqueta los datos visibles en pantalla para enviarlos al backend.
+    const handleAiAnalysis = useCallback(() => {
+        if (!data || !filters) return;
+
+        const payload = {
+            year: filters.year,
+            event_name: filters.round,
+            session_name: filters.session,
+            drivers: data.drivers.map(d => ({
+                driver_code: d.driverCode,
+                best_lap: d.bestLap.time,
+                best_lap_number: d.bestLap.lapNumber,
+                average: d.average,
+                median: d.median,
+                std_dev: d.stdDev,
+                consistency: d.consistency,
+                valid_laps: d.validLaps,
+                strategy: d.strategy.map(s => s.label),
+            })),
+        };
+
+        ai.analyse(payload);
+    }, [data, filters, ai.analyse]);
 
     if (!filters) {
         return (
@@ -50,6 +79,33 @@ export default function SummaryStatistics({ filters }) {
                     </div>
                 </div>
             )}
+
+            {/* --- Botón de análisis IA --- */}
+
+            {data && !isLoading && (
+                <div className="px-5 pt-4 pb-1 flex justify-end">
+                    <button
+                        onClick={handleAiAnalysis}
+                        disabled={ai.isLoading}
+                        className="flex items-center gap-2 px-4 py-2 border border-purple-800
+                                   bg-purple-950/30 text-purple-300 text-xs font-bold uppercase
+                                   tracking-widest hover:bg-purple-900/40 hover:border-purple-600
+                                   transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <span className="text-sm">✦</span>
+                        {ai.isLoading ? 'Analyzing...' : 'AI Analysis'}
+                    </button>
+                </div>
+            )}
+
+            {/* --- Panel de resultado IA --- */}
+
+            <AiInsightPanel
+                analysis={ai.analysis}
+                isLoading={ai.isLoading}
+                error={ai.error}
+                onClose={ai.reset}
+            />
 
             {/* --- Grid de tarjetas --- */}
 
