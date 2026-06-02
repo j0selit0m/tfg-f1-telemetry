@@ -56,7 +56,7 @@ def _build_driver_summary(
 
     Aplica dos filtros distintos según el caso:
       - Conteo de vueltas: incluye VSC/SC/pit. Solo se descartan vueltas sin
-        tiempo o borradas por los comisarios (criterio Tracing Insights).
+        tiempo o borradas por los comisarios.
       - Estadísticas: excluye además pit in/out con pick_wo_box(), ya que
         incluyen ~20-30s del pit stop y distorsionarían las métricas.
         Las vueltas bajo VSC/SC se mantienen por ser representativas del coche.

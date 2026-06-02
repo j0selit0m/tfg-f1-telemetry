@@ -169,7 +169,7 @@ def build_track_response(
     """Construye la comparativa de microsectores para N pilotos de la misma sesión.
 
     El trazado se divide en N_SECTORS = 25 tramos iguales usando RelativeDistance
-    (0.0-1.0), siguiendo la misma metodología que Tracing Insights.
+    (0.0-1.0).
 
     Args:
         driver_configs: Lista producida por parse_drivers(). Todos deben ser
