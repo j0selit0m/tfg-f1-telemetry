@@ -19,9 +19,11 @@ from dtos.ai_dto import (
 
 def _session_context(session_name: str) -> str:
     """Clasifica el tipo de sesión para adaptar las instrucciones del prompt."""
-    if session_name in ("Race", "Sprint"):
+    if session_name == "Race":
         return "race"
-    if session_name == "Qualifying":
+    if session_name == "Sprint":
+        return "sprint"
+    if session_name in ("Qualifying", "Sprint Qualifying"):
         return "qualifying"
     return "practice"
 
@@ -95,6 +97,16 @@ def build_summary_prompt(request: SummaryAnalysisRequest) -> str:
 5. Comment on tyre compounds — in qualifying these indicate which tyre
    the driver relied on for their fastest attempt.
 6. Close with a verdict on who delivered the stronger qualifying performance."""
+
+    elif session_type == "sprint":
+        instructions = """
+1. Start with the Grand Prix name, year and that this is a Sprint Race.
+2. Explain that a Sprint is a shorter race of around 100km with no mandatory
+   pit stops — drivers typically run the full distance on a single set of tyres.
+3. Compare personal best laps and average pace in this context.
+4. Consistency here reflects tyre management over a shorter distance.
+5. Comment on compounds used — in a Sprint, compound choice is more limited.
+6. Close with a verdict on who performed better in the Sprint."""
 
     else:
         instructions = """
@@ -178,6 +190,15 @@ def build_stints_prompt(request: StintsAnalysisRequest) -> str:
 3. Identify which run produced the best lap for each driver.
 4. Comment on consistency within each run.
 5. Close with who made better use of their qualifying runs."""
+
+    elif session_type == "sprint":
+        instructions = """
+1. Start with the Grand Prix name, year and that this is a Sprint Race.
+2. Explain that Sprints typically have one stint with no mandatory pit stops.
+   If a driver made a pit stop, it was likely due to damage or a strategic gamble.
+3. Compare pace and consistency across the single stint.
+4. If a driver completed significantly fewer laps, suggest a possible retirement.
+5. Close with a verdict on who managed the Sprint better."""
 
     else:
         instructions = """
@@ -273,6 +294,18 @@ Using ALL the lap data above AND your knowledge of this qualifying session:
 4. If yellow or red flags appear in the data, suggest what may have
    caused them and how they affected each driver.
 5. Close with who had the cleaner, more effective qualifying session."""
+
+    elif session_type == "sprint":
+        instructions = """
+Using ALL the lap data above AND your knowledge of this specific event:
+1. Start with the Grand Prix name, year and circuit name.
+2. Explain that a Sprint Race is a shorter format of around 100km with no
+   mandatory pit stops — tyre management is crucial over the full distance.
+3. Walk through the key moments: position changes, pace evolution,
+   and any SC or VSC periods.
+4. If a driver pitted, explain this was unusual and comment on the possible reason.
+5. If a driver completed significantly fewer laps, suggest a possible retirement.
+6. Close with a summary of the Sprint race narrative for these drivers."""
 
     else:
         instructions = """
