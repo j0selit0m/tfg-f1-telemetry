@@ -1,15 +1,70 @@
 // Orquestador de la vista de vueltas. Consume useLapData y compone la tabla
 // con una fila por vuelta y una columna por piloto seleccionado.
+// Integra el módulo de análisis con IA mediante el botón y panel dedicados.
 
-import { useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useLapData } from './useLapData';
+import { useAiAnalysis } from '../../hooks/useAiAnalysis';
 import LapRow from './LapRow';
+import AiInsightPanel from '../../components/AiInsightPanel';
 
 export default function LapDataGrid({ filters }) {
     const { data, isLoading, error, refetch } = useLapData(filters);
+    const ai = useAiAnalysis('/ai/laps-analysis');
+
+    useEffect(() => {
+        ai.reset();
+    }, [filters?.year, filters?.round, filters?.session, filters?.driver]);
 
     // El orden de columnas lo dicta el backend, no el cliente
     const driverKeys = data?.drivers ?? [];
+
+    // Extrae los datos objetivos que el usuario ve en pantalla por piloto.
+    // No hace cálculos estadísticos — solo filtra y agrupa lo que ya está en el DTO.
+    const handleAiAnalysis = useCallback(() => {
+        if (!data || !filters) return;
+
+        const driversPayload = data.drivers.map(code => {
+            // Recorre todas las vueltas buscando datos de este piloto.
+            const entries = data.laps
+                .map(row => ({ lapNumber: row.lapNumber, entry: row.entries[code] ?? null }))
+                .filter(({ entry }) => entry !== null);
+
+            const bestLapRow = entries.find(({ entry }) => entry.isFastestLap);
+            const pitLaps = entries
+                .filter(({ entry }) => entry.pitIn)
+                .map(({ lapNumber }) => lapNumber);
+            const scLaps = entries
+                .filter(({ entry }) => entry.trackStatus?.includes('4') && !entry.trackStatus?.includes('6'))
+                .map(({ lapNumber }) => lapNumber);
+
+            const vscLaps = entries
+                .filter(({ entry }) => entry.trackStatus?.includes('6'))
+                .map(({ lapNumber }) => lapNumber);
+
+            const firstEntry = entries[0]?.entry ?? null;
+            const lastEntry = entries[entries.length - 1]?.entry ?? null;
+
+            return {
+                driver: code,
+                best_lap_time: bestLapRow?.entry.lapTime ?? null,
+                best_lap_number: bestLapRow?.lapNumber ?? null,
+                pit_laps: pitLaps,
+                sc_laps: scLaps,
+                vsc_laps: vscLaps,
+                total_laps: entries.length,
+                start_position: firstEntry?.position ?? null,
+                end_position: lastEntry?.position ?? null,
+            };
+        });
+
+        ai.analyse({
+            year: filters.year,
+            event_name: filters.round,
+            session_name: filters.session,
+            drivers: driversPayload,
+        });
+    }, [data, filters, ai.analyse]);
 
     if (!filters) {
         return (
@@ -25,11 +80,38 @@ export default function LapDataGrid({ filters }) {
     return (
         <div className="flex flex-col h-full w-full bg-[#0a0a0c] border border-gray-800 shadow-2xl font-sans text-gray-200">
 
+            {/* --- Banner de error --- */}
+
+            {error && !isLoading && (
+                <div className="flex items-center gap-3 border-b border-red-900/60 bg-red-950/20 px-5 py-3 shrink-0">
+                    <span className="text-red-500 font-black text-lg shrink-0">⚠</span>
+                    <span className="text-red-400 text-xs font-mono flex-1 break-all">{error}</span>
+                    <button
+                        onClick={refetch}
+                        className="text-red-500 border border-red-900 px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-red-900/30 transition-colors shrink-0"
+                    >
+                        RETRY
+                    </button>
+                </div>
+            )}
+
+            {/* --- Panel de resultado IA --- */}
+
+            <AiInsightPanel
+                show={!!data && !isLoading}
+                onAnalyse={handleAiAnalysis}
+                analysis={ai.analysis}
+                isLoading={ai.isLoading}
+                error={ai.error}
+            />
+
+            {/* --- Leyenda --- */}
+
             <Legend filters={filters} />
 
-            {/* --- Estados de carga, error y vacío --- */}
+            {/* --- Tabla principal --- */}
 
-            <div className="flex-1 overflow-auto bg-[#0a0a0c] relative">
+            <div className="flex-1 overflow-auto relative">
 
                 {isLoading && (
                     <div className="absolute inset-0 z-20 bg-[#0a0a0c]/80 backdrop-blur-sm flex flex-col items-center justify-center">
@@ -39,30 +121,6 @@ export default function LapDataGrid({ filters }) {
                         </div>
                     </div>
                 )}
-
-                {error && !isLoading && (
-                    <div className="flex items-center gap-3 border-b border-red-900/60 bg-red-950/20 px-5 py-3">
-                        <span className="text-red-500 font-black text-lg">⚠</span>
-                        <span className="text-red-400 text-xs font-mono flex-1 break-all">{error}</span>
-                        <button
-                            onClick={refetch}
-                            className="text-red-500 border border-red-900 px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-red-900/30 transition-colors shrink-0"
-                        >
-                            RETRY
-                        </button>
-                    </div>
-                )}
-
-                {!isLoading && !error && (!data || data.laps.length === 0) && (
-                    <div className="flex h-full items-center justify-center flex-col opacity-50">
-                        <h2 className="text-2xl font-black italic uppercase tracking-widest text-gray-500">Telemetry Standby</h2>
-                        <p className="text-sm font-mono text-gray-600 mt-2">
-                            Select parameters and drivers in the side panel to start the analysis.
-                        </p>
-                    </div>
-                )}
-
-                {/* --- Tabla principal --- */}
 
                 {!isLoading && data && data.laps.length > 0 && (
                     <table className="w-full text-left border-collapse">

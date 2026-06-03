@@ -1,8 +1,11 @@
 """
-Cliente asíncrono para la API de Google Gemini.
+Cliente asíncrono para la API de Google Gemini 2.5 Flash.
 
-Usa httpx en lugar del SDK oficial de Google para evitar dependencias
-pesadas. Solo necesita la API key y el modelo como configuración.
+Usa httpx en lugar del SDK oficial para evitar dependencias pesadas.
+Configuración unificada para todos los análisis de la aplicación:
+    - temperature: 0.2  (respuestas precisas y consistentes)
+    - maxOutputTokens: 1500
+    - thinkingBudget: 1024 (razonamiento moderado antes de responder)
 
 Referencia:
     https://ai.google.dev/gemini-api/docs/text-generation
@@ -34,13 +37,15 @@ async def generate_content(prompt: str) -> str:
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
-            "temperature": 0.7,
-            "maxOutputTokens": 1024,
-            "thinkingConfig": {"thinkingBudget": 0},
+            "temperature": 0.2,
+            "maxOutputTokens": 1500,
+            "thinkingConfig": {
+                "thinkingBudget": 1024,
+            },
         },
     }
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=60.0) as client:
         response = await client.post(url, json=payload)
 
     if response.status_code != 200:

@@ -1,14 +1,50 @@
 // Orquestador de la vista de análisis de stints. Consume useStintAnalysis
 // y renderiza una tabla con una fila por stint y una columna por piloto.
+// Integra el módulo de análisis con IA mediante el botón y panel dedicados.
 
+import { useCallback, useEffect } from 'react';
 import { useStintAnalysis } from './useStintAnalysis';
+import { useAiAnalysis } from '../../hooks/useAiAnalysis';
 import StintCell from './StintCell';
+import AiInsightPanel from '../../components/AiInsightPanel';
 
 export default function StintAnalysis({ filters }) {
     const { data, isLoading, error, refetch } = useStintAnalysis(filters);
+    const ai = useAiAnalysis('/ai/stints-analysis');
+
+    useEffect(() => {
+        ai.reset();
+    }, [filters?.year, filters?.round, filters?.session, filters?.driver]);
 
     // Orden de columnas dictado por el backend; fallback al filtro mientras carga
     const driverKeys = data?.drivers ?? (filters?.driver ? filters.driver.split(',') : []);
+
+    // Empaqueta los datos de stints visibles en pantalla para enviarlos al backend.
+    const handleAiAnalysis = useCallback(() => {
+        if (!data || !filters) return;
+
+        ai.analyse({
+            year: filters.year,
+            event_name: filters.round,
+            session_name: filters.session,
+            drivers: data.drivers,
+            stints: data.stints.map(stint => ({
+                stint_number: stint.stintNumber,
+                drivers: Object.fromEntries(
+                    Object.entries(stint.drivers).map(([code, d]) => [
+                        code,
+                        d ? {
+                            compound_label: d.compoundLabel,
+                            duration_laps: d.durationLaps,
+                            best_lap: d.bestLap?.time ?? null,
+                            average: d.average ?? null,
+                            consistency: d.consistency ?? null,
+                        } : null,
+                    ])
+                ),
+            })),
+        });
+    }, [data, filters, ai.analyse]);
 
     if (!filters) {
         return (
@@ -40,6 +76,17 @@ export default function StintAnalysis({ filters }) {
                     </button>
                 </div>
             )}
+
+
+            {/* --- Panel de resultado IA --- */}
+
+            <AiInsightPanel
+                show={!!data && !isLoading}
+                onAnalyse={handleAiAnalysis}
+                analysis={ai.analysis}
+                isLoading={ai.isLoading}
+                error={ai.error}
+            />
 
             {/* --- Tabla --- */}
 

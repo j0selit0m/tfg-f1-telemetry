@@ -5,9 +5,14 @@ Función pública principal:
     build_summary_analysis() → AiAnalysisResponse
 """
 
-from core.ai_prompts import build_summary_prompt
+from core.ai_prompts import build_summary_prompt, build_stints_prompt, build_laps_prompt
 from core.gemini_client import generate_content
-from dtos.ai_dto import AiAnalysisResponse, SummaryAnalysisRequest
+from dtos.ai_dto import (
+    AiAnalysisResponse,
+    LapsAnalysisRequest,
+    SummaryAnalysisRequest,
+    StintsAnalysisRequest,
+)
 
 
 async def build_summary_analysis(
@@ -28,5 +33,40 @@ async def build_summary_analysis(
         RuntimeError: Propagada desde gemini_client si la API falla.
     """
     prompt = build_summary_prompt(request)
+    analysis_text = await generate_content(prompt)
+    return AiAnalysisResponse(analysis=analysis_text)
+
+
+async def build_stints_analysis(
+    request: StintsAnalysisRequest,
+) -> AiAnalysisResponse:
+    """Genera un análisis textual de las métricas de stints de sesión.
+
+    Args:
+        request: Datos de stints enviados por el frontend.
+
+    Returns:
+        AiAnalysisResponse con el texto del análisis.
+    """
+    prompt = build_stints_prompt(request)
+    analysis_text = await generate_content(prompt)
+    return AiAnalysisResponse(analysis=analysis_text)
+
+
+async def build_laps_analysis(
+    request: LapsAnalysisRequest,
+) -> AiAnalysisResponse:
+    """Genera una narrativa de carrera a partir de los datos objetivos de vueltas.
+
+    Combina los datos extraídos por el frontend con el conocimiento de Gemini
+    sobre el evento para explicar al usuario lo que ocurrió en la sesión.
+
+    Args:
+        request: Datos objetivos de vueltas enviados por el frontend.
+
+    Returns:
+        AiAnalysisResponse con el texto narrativo del análisis.
+    """
+    prompt = build_laps_prompt(request)
     analysis_text = await generate_content(prompt)
     return AiAnalysisResponse(analysis=analysis_text)

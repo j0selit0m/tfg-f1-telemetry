@@ -2,7 +2,7 @@
 // y renderiza una tarjeta por piloto seleccionado.
 // Integra el módulo de análisis con IA mediante el botón y panel dedicados.
 
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useSessionSummary } from './useSessionSummary';
 import { useAiAnalysis } from '../../hooks/useAiAnalysis';
 import DriverCard from './DriverCard';
@@ -11,6 +11,10 @@ import AiInsightPanel from '../../components/AiInsightPanel';
 export default function SummaryStatistics({ filters }) {
     const { data, isLoading, error, refetch } = useSessionSummary(filters);
     const ai = useAiAnalysis('/ai/summary-analysis');
+
+    useEffect(() => {
+        ai.reset();
+    }, [filters?.year, filters?.round, filters?.session, filters?.driver]);
 
     const fastestCode = data?.fastestDriver?.driverCode ?? null;
 
@@ -80,31 +84,14 @@ export default function SummaryStatistics({ filters }) {
                 </div>
             )}
 
-            {/* --- Botón de análisis IA --- */}
-
-            {data && !isLoading && (
-                <div className="px-5 pt-4 pb-1 flex justify-end">
-                    <button
-                        onClick={handleAiAnalysis}
-                        disabled={ai.isLoading}
-                        className="flex items-center gap-2 px-4 py-2 border border-purple-800
-                                   bg-purple-950/30 text-purple-300 text-xs font-bold uppercase
-                                   tracking-widest hover:bg-purple-900/40 hover:border-purple-600
-                                   transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <span className="text-sm">✦</span>
-                        {ai.isLoading ? 'Analyzing...' : 'AI Analysis'}
-                    </button>
-                </div>
-            )}
-
             {/* --- Panel de resultado IA --- */}
 
             <AiInsightPanel
+                show={!!data && !isLoading}
+                onAnalyse={handleAiAnalysis}
                 analysis={ai.analysis}
                 isLoading={ai.isLoading}
                 error={ai.error}
-                onClose={ai.reset}
             />
 
             {/* --- Grid de tarjetas --- */}

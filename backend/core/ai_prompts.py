@@ -7,38 +7,291 @@ Se centraliza aquí para facilitar el ajuste de los prompts
 sin tocar la lógica de negocio.
 """
 
-from dtos.ai_dto import SummaryAnalysisRequest
+from dtos.ai_dto import (
+    SummaryAnalysisRequest,
+    StintsAnalysisRequest,
+    LapsAnalysisRequest,
+)
+
+
+# --- Helpers privados ---
+
+
+def _session_context(session_name: str) -> str:
+    """Clasifica el tipo de sesión para adaptar las instrucciones del prompt."""
+    if session_name in ("Race", "Sprint"):
+        return "race"
+    if session_name == "Qualifying":
+        return "qualifying"
+    return "practice"
+
+
+# --- Rol unificado ---
+
+_ROLE = """You are a clear and educational Formula 1 analyst explaining a session
+to someone who enjoys watching races but may not be familiar with all the
+technical details. Your goal is to make the data easy to understand,
+not to be dramatic or use complex jargon.
+
+Important rules:
+- Do not mention weather or track conditions based on assumptions.
+  However, if the tyre compounds data includes Intermediate (I) or Wet (W)
+  tyres, you may infer that rain or wet conditions were present.
+- Never assert something as fact if you are not certain — use phrases like
+  "this may suggest", "it appears" or "possibly" when inferring.
+- Explain technical terms briefly the first time you use them,
+  but do not repeat the same explanation later in the response."""
+
+
+# --- Prompts públicos ---
 
 
 def build_summary_prompt(request: SummaryAnalysisRequest) -> str:
+    """Construye el prompt para analizar las estadísticas de resumen de sesión."""
+    session_type = _session_context(request.session_name)
 
     drivers_block = "\n".join(
-        f"- {d.driver_code}: best lap {d.best_lap or 'N/A'} (lap #{d.best_lap_number or '?'}), "
+        f"- {d.driver_code}: personal best lap {d.best_lap or 'N/A'} (lap #{d.best_lap_number or '?'}), "
         f"average {d.average or 'N/A'}, median {d.median or 'N/A'}, "
         f"std dev {d.std_dev or 'N/A'}, consistency {d.consistency:.1f}%, "
-        f"{d.valid_laps} valid laps, strategy: {' → '.join(d.strategy)}"
+        f"{d.valid_laps} valid laps, compounds used: {' → '.join(d.strategy)}"
         for d in request.drivers
     )
 
-    return f"""You are a Formula 1 telemetry and race strategy engineer.
-Analyze the following statistics from the {request.session_name} session
-of the {request.event_name} Grand Prix ({request.year}).
+    if session_type == "race":
+        instructions = """
+1. Start with the Grand Prix name, year and that this is a race summary.
+2. Compare each driver's personal best lap — their fastest individual lap
+   during the race, not necessarily the official fastest lap of the race.
+3. Compare average and median pace. Explain that the average is the typical
+   lap time across the race, while the median is less affected by slow laps
+   like pit stop laps or safety car periods.
+4. Explain consistency and standard deviation in plain language: consistency
+   shows how similar a driver's laps were to each other. High consistency
+   means very regular lap times, which usually indicates good tyre management.
+   A lower consistency can suggest incidents, traffic or tyre degradation.
+5. Comment on the tyre compounds used.
+6. Close with a clear verdict on who had the stronger overall race."""
+
+    elif session_type == "qualifying":
+        instructions = """
+1. Start with the Grand Prix name, year and that this is a qualifying summary.
+2. Compare personal best lap times — in qualifying this is the definitive
+   performance metric that determines grid position.
+3. Explain that average and median here reflect how consistent the driver
+   was across multiple flying laps during the session.
+4. Explain consistency: in qualifying, high consistency means the driver
+   was able to extract maximum performance repeatedly from the car.
+5. Comment on tyre compounds — in qualifying these indicate which tyre
+   the driver relied on for their fastest attempt.
+6. Close with a verdict on who delivered the stronger qualifying performance."""
+
+    else:
+        instructions = """
+1. Start with the Grand Prix name, year and which practice session this is.
+2. Note that in practice, lap times are less representative than in qualifying
+   or the race — teams are often testing different setups or tyre compounds.
+3. Compare best laps and average pace with that context in mind.
+4. Explain consistency as an indicator of how well each driver adapted
+   to the car in this session.
+5. Comment on tyre compounds — in practice, trying different compounds
+   usually means the team is collecting data for race strategy decisions.
+6. Close with what the data suggests about each driver's preparation."""
+
+    return f"""{_ROLE}
+
+Analyze the following {request.session_name} statistics from the
+{request.event_name} {request.year}:
 
 DRIVER DATA:
 {drivers_block}
 
 INSTRUCTIONS:
-Write a structured analysis strictly following this order:
-1. Open with an introductory sentence mentioning the Grand Prix, year and session.
-2. Compare each driver's best lap: who was faster and by how much.
-3. Compare average pace (average and median): who sustained better race rhythm.
-4. Interpret consistency: who was more regular and what it suggests.
-5. Close with a concluding sentence about who dominated the session overall.
+{instructions}
 
 FORMAT:
 - Respond in English.
-- Between 100 and 150 words exactly.
-- Two paragraphs: the first covers points 1, 2 and 3; the second covers 4 and 5.
+- Around 100 words. Be clear and concise.
+- Two short paragraphs.
 - Plain text, no markdown, no bold, no headers.
-- Always start with: "In the {request.session_name} of the {request.event_name} Grand Prix ({request.year}),"
+- Always start with: "The {request.year} {request.event_name} {request.session_name}"
+"""
+
+
+def build_stints_prompt(request: StintsAnalysisRequest) -> str:
+    """Construye el prompt para analizar las métricas de stints de sesión."""
+    session_type = _session_context(request.session_name)
+
+    stints_block = ""
+    total_laps_per_driver = {code: 0 for code in request.drivers}
+
+    for stint in request.stints:
+        stints_block += f"\nStint {stint.stint_number}:\n"
+        for code in request.drivers:
+            d = stint.drivers.get(code)
+            if d is None:
+                stints_block += f"  - {code}: no data\n"
+            else:
+                total_laps_per_driver[code] += d.duration_laps
+                stints_block += (
+                    f"  - {code}: compound {d.compound_label}, "
+                    f"{d.duration_laps} laps, "
+                    f"personal best lap in stint {d.best_lap or 'N/A'}, "
+                    f"average {d.average or 'N/A'}, "
+                    f"consistency {f'{d.consistency:.1f}%' if d.consistency is not None else 'N/A'}\n"
+                )
+
+    laps_summary = ", ".join(
+        f"{code}: {laps} laps total" for code, laps in total_laps_per_driver.items()
+    )
+
+    if session_type == "race":
+        instructions = """
+1. Start with the Grand Prix name, year and session type.
+2. Compare total laps completed by each driver. If one driver completed
+   significantly fewer laps or stints than the other, suggest — without
+   asserting it as fact — that they may have retired or had an incident.
+3. Compare tyre strategies: which compounds were chosen and for how many laps.
+   If one driver's tyres lasted noticeably more laps on the same compound,
+   explain what that might suggest about pace or tyre management.
+   A stint is a continuous period on the same set of tyres between pit stops.
+4. Compare pace within each stint: who was faster and more consistent.
+5. Close with a clear verdict on whose strategy appeared more effective."""
+
+    elif session_type == "qualifying":
+        instructions = """
+1. Start with the Grand Prix name, year and qualifying session.
+2. In qualifying, each stint represents a run on track on a set of tyres.
+   Compare how many runs each driver completed and which compounds they used.
+3. Identify which run produced the best lap for each driver.
+4. Comment on consistency within each run.
+5. Close with who made better use of their qualifying runs."""
+
+    else:
+        instructions = """
+1. Start with the Grand Prix name, year and practice session.
+2. In practice, different tyre compounds indicate teams evaluating
+   race strategy options. Explain this briefly.
+3. Comment on stint lengths: longer stints suggest race pace evaluation,
+   shorter stints suggest setup or qualifying simulation work.
+4. Compare pace and consistency across stints.
+5. Close with what the stint data suggests about each driver's preparation."""
+
+    return f"""{_ROLE}
+
+Analyze the following {request.session_name} stint data from the
+{request.event_name} {request.year}:
+
+TOTAL LAPS COMPLETED: {laps_summary}
+
+STINT DATA:
+{stints_block}
+
+INSTRUCTIONS:
+{instructions}
+
+FORMAT:
+- Respond in English.
+- Around 150 words. Be clear and educational.
+- Two or three short paragraphs.
+- Plain text, no markdown, no bold, no headers.
+- Always start with: "The {request.year} {request.event_name} {request.session_name}"
+"""
+
+
+def build_laps_prompt(request: LapsAnalysisRequest) -> str:
+    """Construye el prompt para analizar los datos de vueltas de sesión."""
+    session_type = _session_context(request.session_name)
+
+    drivers_block = ""
+    for d in request.drivers:
+        position_info = ""
+        if d.start_position and d.end_position:
+            delta = d.start_position - d.end_position
+            direction = (
+                f"+{delta} positions gained"
+                if delta > 0
+                else f"{abs(delta)} positions lost"
+                if delta < 0
+                else "no position change"
+            )
+            position_info = f"P{d.start_position} → P{d.end_position} ({direction})"
+
+        drivers_block += f"\n{d.driver}:\n"
+        drivers_block += f"  - Personal best lap: {d.best_lap_time or 'N/A'} (lap {d.best_lap_number or '?'} of {d.total_laps})\n"
+        drivers_block += f"  - Pit stops: laps {d.pit_laps if d.pit_laps else 'none'}\n"
+        if d.sc_laps:
+            drivers_block += f"  - Safety Car laps: {d.sc_laps}\n"
+        if d.vsc_laps:
+            drivers_block += f"  - Virtual Safety Car laps: {d.vsc_laps}\n"
+        if position_info:
+            drivers_block += f"  - Position: {position_info}\n"
+
+    all_sc = sorted(set(lap for d in request.drivers for lap in d.sc_laps))
+    all_vsc = sorted(set(lap for d in request.drivers for lap in d.vsc_laps))
+    incidents_block = ""
+    if all_sc:
+        incidents_block += f"Safety Car periods detected on laps: {all_sc}\n"
+    if all_vsc:
+        incidents_block += f"Virtual Safety Car periods detected on laps: {all_vsc}\n"
+    if not incidents_block:
+        incidents_block = "No Safety Car or VSC periods.\n"
+
+    if session_type == "race":
+        instructions = """
+Using the data above AND your knowledge of this specific event:
+1. Start with the Grand Prix name, year and circuit name.
+2. Briefly explain what was at stake or the general context of this race.
+3. Walk through the key moments for these drivers: pit stops, position
+   changes, and how Safety Car or VSC periods played out.
+   A pit stop is when the driver enters the pit lane to change tyres.
+   A Safety Car neutralises the race behind a pace car after an incident.
+   A Virtual Safety Car slows all cars electronically without a physical car.
+   If SC or VSC periods appear, use your knowledge to suggest what may have
+   caused them — but phrase it as a suggestion, not a confirmed fact.
+4. If a driver completed significantly fewer laps than expected, suggest
+   they may have retired without asserting it as certain.
+5. Close with a sentence summarising what happened for these drivers."""
+
+    elif session_type == "qualifying":
+        instructions = """
+Using the data above AND your knowledge of this qualifying session:
+1. Start with the Grand Prix name, year and circuit name.
+2. Briefly explain what qualifying is: drivers set their fastest lap to
+   determine their starting grid position for the race.
+3. Comment on how many laps each driver completed and when their best
+   lap came — early in the session or towards the end when the track
+   is usually faster due to more rubber on the surface.
+4. If yellow or red flags appear in the data, suggest what may have
+   caused them and how they affected each driver.
+5. Close with who had the cleaner, more effective qualifying session."""
+
+    else:
+        instructions = """
+1. Start with the Grand Prix name, year and practice session number.
+2. Briefly explain that practice sessions are used to set up the car
+   and learn the circuit, not to go for maximum lap times.
+3. Comment on laps completed and when the best lap was set.
+4. If any SC or flag periods appear, mention them briefly.
+5. Close with what the data suggests about each driver's preparation."""
+
+    return f"""{_ROLE}
+
+Analyze the following {request.session_name} lap-by-lap data from the
+{request.event_name} {request.year}.
+
+SESSION INCIDENTS:
+{incidents_block}
+DRIVER DATA:
+{drivers_block}
+
+INSTRUCTIONS:
+{instructions}
+
+FORMAT:
+- Respond in English.
+- Around 200 words. Be clear, educational and easy to follow.
+- Two or three paragraphs with natural flow.
+- Plain text, no markdown, no bold, no headers.
+- Always start with: "The {request.year} {request.event_name} {request.session_name}"
 """
