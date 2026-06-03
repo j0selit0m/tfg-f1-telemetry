@@ -38,9 +38,9 @@ async def generate_content(prompt: str) -> str:
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
             "temperature": 0.2,
-            "maxOutputTokens": 1500,
+            "maxOutputTokens": 2048,
             "thinkingConfig": {
-                "thinkingBudget": 1024,
+                "thinkingLevel": "low"  # minimal, low, medium, high
             },
         },
     }

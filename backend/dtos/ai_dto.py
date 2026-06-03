@@ -1,10 +1,9 @@
 """
 DTOs del dominio de análisis con IA.
 
-Contratos de datos entre el endpoint de análisis inteligente
-y el cliente React. El request recibe los datos ya procesados
-que el frontend tiene en estado; la response devuelve el texto
-generado por Gemini.
+Contratos de datos entre los endpoints de análisis inteligente
+y el cliente React. Cada request contiene los datos que el usuario
+ve en pantalla; la response devuelve el texto generado por Gemini.
 """
 
 from pydantic import BaseModel, Field
@@ -108,6 +107,8 @@ class LapRowInput(BaseModel):
 
 
 class LapsAnalysisRequest(BaseModel):
+    """Payload que envía el frontend con los datos vuelta a vuelta de la sesión."""
+
     year: int
     event_name: str
     session_name: str

@@ -1,8 +1,10 @@
 """
 Lógica de negocio del módulo de análisis con IA.
 
-Función pública principal:
+Funciones públicas:
     build_summary_analysis() → AiAnalysisResponse
+    build_stints_analysis()  → AiAnalysisResponse
+    build_laps_analysis()    → AiAnalysisResponse
 """
 
 from core.ai_prompts import build_summary_prompt, build_stints_prompt, build_laps_prompt

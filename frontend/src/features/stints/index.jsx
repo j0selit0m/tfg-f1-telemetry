@@ -29,9 +29,9 @@ export default function StintAnalysis({ filters }) {
             session_name: filters.session,
             drivers: data.drivers,
             driver_names: Object.fromEntries(
-                (filters?.driver?.split(',') ?? []).map(code => [
-                    code.trim(),
-                    filters?.driverNames?.[code.trim()] ?? code.trim()
+                data.drivers.map(code => [
+                    code,
+                    filters?.driverNames?.[code] ?? code
                 ])
             ),
             stints: data.stints.map(stint => ({

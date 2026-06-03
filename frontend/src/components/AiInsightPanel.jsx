@@ -25,11 +25,11 @@ export default function AiInsightPanel({
             <div className="flex items-center gap-4 px-5 py-3 bg-[#111318]">
                 <span className="text-amber-400 text-base shrink-0">✦</span>
                 <div className="flex-1 min-w-0">
-                    <p className="text-gray-200 text-xs font-bold uppercase tracking-widest">
+                    <p className="text-gray-200 text-sm font-bold uppercase tracking-widest">
                         AI Analysis
                     </p>
-                    <p className="text-gray-500 text-xs font-mono mt-0.5 truncate">
-                        New to F1 data? Get a plain-English explanation of what you're seeing.
+                    <p className="text-gray-400 text-s font-mono mt-0.5 truncate">
+                        Not sure what this data means? Let AI explain it in plain English.
                     </p>
                 </div>
                 <button
@@ -85,9 +85,14 @@ export default function AiInsightPanel({
                                 <p className="text-red-400 text-sm font-mono">{error}</p>
                             )}
                             {analysis && (
-                                <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-line">
-                                    {analysis}
-                                </p>
+                                <div className="px-5 pb-4">
+                                    <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-line">
+                                        {analysis}
+                                    </p>
+                                    <p className="text-gray-600 text-[12px] font-mono mt-3 border-t border-gray-800 pt-2">
+                                        AI-generated content. May contain inaccuracies - always verify with official sources.
+                                    </p>
+                                </div>
                             )}
                         </div>
                     )}
