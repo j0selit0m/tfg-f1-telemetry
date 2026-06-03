@@ -82,30 +82,32 @@ class StintsAnalysisRequest(BaseModel):
 # --- Laps Analysis Request ---
 
 
-class LapDriverInput(BaseModel):
-    """Datos objetivos de un piloto extraídos de la tabla de vueltas."""
+class LapEntryInput(BaseModel):
+    """Datos de una vuelta individual de un piloto."""
 
-    driver: str
-    best_lap_time: str | None = Field(None, description="Mejor vuelta M:SS.mmm")
-    best_lap_number: int | None = Field(None, description="Número de la mejor vuelta")
-    pit_laps: list[int] = Field(
-        default_factory=list, description="Vueltas donde entró a boxes"
-    )
-    sc_laps: list[int] = Field(
-        default_factory=list, description="Vueltas bajo Safety Car (track_status 4)"
-    )
-    vsc_laps: list[int] = Field(
-        default_factory=list, description="Vueltas bajo VSC (track_status 6)"
-    )
-    total_laps: int = Field(..., description="Total de vueltas completadas")
-    start_position: int | None = Field(None, description="Posición en vuelta 1")
-    end_position: int | None = Field(None, description="Posición en última vuelta")
+    lap_time: str | None = None
+    sector1: str | None = None
+    sector2: str | None = None
+    sector3: str | None = None
+    compound: str | None = None
+    tyre_life: int | None = None
+    position: int | None = None
+    track_status: str | None = None
+    pit_in: bool = False
+    pit_out: bool = False
+    is_fastest_lap: bool = False
+
+
+class LapRowInput(BaseModel):
+    """Una vuelta con los datos de todos los pilotos."""
+
+    lap_number: int
+    entries: dict[str, LapEntryInput | None]
 
 
 class LapsAnalysisRequest(BaseModel):
-    """Payload que envía el frontend con los datos objetivos de la vista de vueltas."""
-
     year: int
     event_name: str
     session_name: str
-    drivers: list[LapDriverInput]
+    drivers: list[str]
+    laps: list[LapRowInput]

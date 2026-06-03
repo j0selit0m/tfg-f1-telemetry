@@ -200,98 +200,59 @@ FORMAT:
 
 
 def build_laps_prompt(request: LapsAnalysisRequest) -> str:
-    """Construye el prompt para analizar los datos de vueltas de sesión."""
     session_type = _session_context(request.session_name)
 
-    drivers_block = ""
-    for d in request.drivers:
-        position_info = ""
-        if d.start_position and d.end_position:
-            delta = d.start_position - d.end_position
-            direction = (
-                f"+{delta} positions gained"
-                if delta > 0
-                else f"{abs(delta)} positions lost"
-                if delta < 0
-                else "no position change"
+    # Construye el bloque de datos vuelta a vuelta.
+    laps_block = ""
+    for row in request.laps:
+        laps_block += f"\nLap {row.lap_number}:\n"
+        for code in request.drivers:
+            entry = row.entries.get(code)
+            if entry is None:
+                continue
+            flags = []
+            if entry.pit_in:
+                flags.append("PIT IN")
+            if entry.pit_out:
+                flags.append("PIT OUT")
+            if entry.is_fastest_lap:
+                flags.append("FASTEST LAP")
+            status = {
+                "1": "clear",
+                "2": "yellow",
+                "4": "SC",
+                "6": "VSC",
+            }.get(entry.track_status or "1", entry.track_status or "")
+            flag_str = f" [{', '.join(flags)}]" if flags else ""
+            laps_block += (
+                f"  {code}: {entry.lap_time or 'N/A'} "
+                f"S1={entry.sector1 or '?'} S2={entry.sector2 or '?'} S3={entry.sector3 or '?'} "
+                f"P{entry.position or '?'} {entry.compound or '?'}/L{entry.tyre_life or '?'} "
+                f"[{status}]{flag_str}\n"
             )
-            position_info = f"P{d.start_position} → P{d.end_position} ({direction})"
-
-        drivers_block += f"\n{d.driver}:\n"
-        drivers_block += f"  - Personal best lap: {d.best_lap_time or 'N/A'} (lap {d.best_lap_number or '?'} of {d.total_laps})\n"
-        drivers_block += f"  - Pit stops: laps {d.pit_laps if d.pit_laps else 'none'}\n"
-        if d.sc_laps:
-            drivers_block += f"  - Safety Car laps: {d.sc_laps}\n"
-        if d.vsc_laps:
-            drivers_block += f"  - Virtual Safety Car laps: {d.vsc_laps}\n"
-        if position_info:
-            drivers_block += f"  - Position: {position_info}\n"
-
-    all_sc = sorted(set(lap for d in request.drivers for lap in d.sc_laps))
-    all_vsc = sorted(set(lap for d in request.drivers for lap in d.vsc_laps))
-    incidents_block = ""
-    if all_sc:
-        incidents_block += f"Safety Car periods detected on laps: {all_sc}\n"
-    if all_vsc:
-        incidents_block += f"Virtual Safety Car periods detected on laps: {all_vsc}\n"
-    if not incidents_block:
-        incidents_block = "No Safety Car or VSC periods.\n"
-
-    if session_type == "race":
-        instructions = """
-Using the data above AND your knowledge of this specific event:
-1. Start with the Grand Prix name, year and circuit name.
-2. Briefly explain what was at stake or the general context of this race.
-3. Walk through the key moments for these drivers: pit stops, position
-   changes, and how Safety Car or VSC periods played out.
-   A pit stop is when the driver enters the pit lane to change tyres.
-   A Safety Car neutralises the race behind a pace car after an incident.
-   A Virtual Safety Car slows all cars electronically without a physical car.
-   If SC or VSC periods appear, use your knowledge to suggest what may have
-   caused them — but phrase it as a suggestion, not a confirmed fact.
-4. If a driver completed significantly fewer laps than expected, suggest
-   they may have retired without asserting it as certain.
-5. Close with a sentence summarising what happened for these drivers."""
-
-    elif session_type == "qualifying":
-        instructions = """
-Using the data above AND your knowledge of this qualifying session:
-1. Start with the Grand Prix name, year and circuit name.
-2. Briefly explain what qualifying is: drivers set their fastest lap to
-   determine their starting grid position for the race.
-3. Comment on how many laps each driver completed and when their best
-   lap came — early in the session or towards the end when the track
-   is usually faster due to more rubber on the surface.
-4. If yellow or red flags appear in the data, suggest what may have
-   caused them and how they affected each driver.
-5. Close with who had the cleaner, more effective qualifying session."""
-
-    else:
-        instructions = """
-1. Start with the Grand Prix name, year and practice session number.
-2. Briefly explain that practice sessions are used to set up the car
-   and learn the circuit, not to go for maximum lap times.
-3. Comment on laps completed and when the best lap was set.
-4. If any SC or flag periods appear, mention them briefly.
-5. Close with what the data suggests about each driver's preparation."""
 
     return f"""{_ROLE}
 
 Analyze the following {request.session_name} lap-by-lap data from the
 {request.event_name} {request.year}.
 
-SESSION INCIDENTS:
-{incidents_block}
-DRIVER DATA:
-{drivers_block}
+LAP DATA:
+{laps_block}
 
 INSTRUCTIONS:
-{instructions}
+Using ALL the lap data above AND your knowledge of this specific event:
+1. Start with the Grand Prix name, year and circuit name.
+2. Walk through the key moments: position changes, pit stops, SC/VSC periods,
+   pace evolution across the race.
+3. Comment on sector times if there are notable differences between drivers.
+4. If a driver completed significantly fewer laps, suggest they may have retired.
+5. Close with a summary of what happened for these drivers.
 
 FORMAT:
 - Respond in English.
-- Around 200 words. Be clear, educational and easy to follow.
-- Two or three paragraphs with natural flow.
+- Around 250 words. Be clear and educational.
+- CRITICAL: Only analyze the drivers present in the data above. Do not mention or infer information about any other drivers not included in this dataset.
+- Three paragraphs with natural flow.
 - Plain text, no markdown, no bold, no headers.
 - Always start with: "The {request.year} {request.event_name} {request.session_name}"
 """

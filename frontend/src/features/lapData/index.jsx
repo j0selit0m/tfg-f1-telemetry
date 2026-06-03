@@ -24,45 +24,32 @@ export default function LapDataGrid({ filters }) {
     const handleAiAnalysis = useCallback(() => {
         if (!data || !filters) return;
 
-        const driversPayload = data.drivers.map(code => {
-            // Recorre todas las vueltas buscando datos de este piloto.
-            const entries = data.laps
-                .map(row => ({ lapNumber: row.lapNumber, entry: row.entries[code] ?? null }))
-                .filter(({ entry }) => entry !== null);
-
-            const bestLapRow = entries.find(({ entry }) => entry.isFastestLap);
-            const pitLaps = entries
-                .filter(({ entry }) => entry.pitIn)
-                .map(({ lapNumber }) => lapNumber);
-            const scLaps = entries
-                .filter(({ entry }) => entry.trackStatus?.includes('4') && !entry.trackStatus?.includes('6'))
-                .map(({ lapNumber }) => lapNumber);
-
-            const vscLaps = entries
-                .filter(({ entry }) => entry.trackStatus?.includes('6'))
-                .map(({ lapNumber }) => lapNumber);
-
-            const firstEntry = entries[0]?.entry ?? null;
-            const lastEntry = entries[entries.length - 1]?.entry ?? null;
-
-            return {
-                driver: code,
-                best_lap_time: bestLapRow?.entry.lapTime ?? null,
-                best_lap_number: bestLapRow?.lapNumber ?? null,
-                pit_laps: pitLaps,
-                sc_laps: scLaps,
-                vsc_laps: vscLaps,
-                total_laps: entries.length,
-                start_position: firstEntry?.position ?? null,
-                end_position: lastEntry?.position ?? null,
-            };
-        });
-
         ai.analyse({
             year: filters.year,
             event_name: filters.round,
             session_name: filters.session,
-            drivers: driversPayload,
+            drivers: data.drivers,
+            laps: data.laps.map(row => ({
+                lap_number: row.lapNumber,
+                entries: Object.fromEntries(
+                    Object.entries(row.entries).map(([code, entry]) => [
+                        code,
+                        entry ? {
+                            lap_time: entry.lapTime,
+                            sector1: entry.sector1,
+                            sector2: entry.sector2,
+                            sector3: entry.sector3,
+                            compound: entry.compound,
+                            tyre_life: entry.tyreLife,
+                            position: entry.position,
+                            track_status: entry.trackStatus,
+                            pit_in: entry.pitIn,
+                            pit_out: entry.pitOut,
+                            is_fastest_lap: entry.isFastestLap,
+                        } : null
+                    ])
+                )
+            }))
         });
     }, [data, filters, ai.analyse]);
 
