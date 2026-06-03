@@ -28,6 +28,12 @@ export default function StintAnalysis({ filters }) {
             event_name: filters.round,
             session_name: filters.session,
             drivers: data.drivers,
+            driver_names: Object.fromEntries(
+                (filters?.driver?.split(',') ?? []).map(code => [
+                    code.trim(),
+                    filters?.driverNames?.[code.trim()] ?? code.trim()
+                ])
+            ),
             stints: data.stints.map(stint => ({
                 stint_number: stint.stintNumber,
                 drivers: Object.fromEntries(

@@ -85,6 +85,7 @@ export function useF1SessionData() {
             round: selectedEvent,
             session: selectedSession,
             driver: selectedDrivers.join(','),
+            driverNames: Object.fromEntries(selected.map(d => [d.abbreviation, d.fullName])),
             availableSessions: sessions.map(s => s.id),
             driverColors: Object.fromEntries(selected.map(d => [d.abbreviation, d.driverColor])),
             teamColors: Object.fromEntries(selected.map(d => [d.abbreviation, d.teamColor])),

@@ -37,6 +37,12 @@ export default function SummaryStatistics({ filters }) {
                 valid_laps: d.validLaps,
                 strategy: d.strategy.map(s => s.label),
             })),
+            driver_names: Object.fromEntries(
+                data.drivers.map(d => [
+                    d.driverCode,
+                    filters?.driverNames?.[d.driverCode] ?? d.driverCode
+                ])
+            ),
         };
 
         ai.analyse(payload);

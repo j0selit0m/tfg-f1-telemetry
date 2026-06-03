@@ -29,6 +29,12 @@ export default function LapDataGrid({ filters }) {
             event_name: filters.round,
             session_name: filters.session,
             drivers: data.drivers,
+            driver_names: Object.fromEntries(
+                (filters?.driver?.split(',') ?? []).map(code => [
+                    code.trim(),
+                    filters?.driverNames?.[code.trim()] ?? code.trim()
+                ])
+            ),
             laps: data.laps.map(row => ({
                 lap_number: row.lapNumber,
                 entries: Object.fromEntries(

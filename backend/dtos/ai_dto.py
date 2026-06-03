@@ -38,6 +38,7 @@ class SummaryAnalysisRequest(BaseModel):
     event_name: str = Field(..., description="Nombre del Gran Premio")
     session_name: str = Field(..., description="Race, Qualifying, FP1…")
     drivers: list[DriverSummaryInput]
+    driver_names: dict[str, str] = Field(default_factory=dict)
 
 
 # --- Response ---
@@ -77,6 +78,7 @@ class StintsAnalysisRequest(BaseModel):
     session_name: str
     drivers: list[str]
     stints: list[StintEntryInput]
+    driver_names: dict[str, str] = Field(default_factory=dict)
 
 
 # --- Laps Analysis Request ---
@@ -111,3 +113,4 @@ class LapsAnalysisRequest(BaseModel):
     session_name: str
     drivers: list[str]
     laps: list[LapRowInput]
+    driver_names: dict[str, str] = Field(default_factory=dict)
