@@ -41,14 +41,6 @@ export function useChartZoom(maxDistance) {
         domainRef.current.end = e;
     }, []);
 
-    const pixelToDistance = useCallback((clientX, rect) => {
-        const plotLeft = rect.left + PLOT_LEFT_OFFSET;
-        const plotWidth = rect.width - PLOT_LEFT_OFFSET - PLOT_RIGHT_OFFSET;
-        const ratio = Math.max(0, Math.min(1, (clientX - plotLeft) / plotWidth));
-        const { start, end } = domainRef.current;
-        return start + ratio * (end - start);
-    }, []);
-
     const buildWheelHandler = useCallback((getRect) => (e) => {
         e.preventDefault();
         const rect = getRect();
@@ -114,6 +106,5 @@ export function useChartZoom(maxDistance) {
         handleMouseUp,
         resetZoom,
         zoomPercent,
-        pixelToDistance,
     };
 }

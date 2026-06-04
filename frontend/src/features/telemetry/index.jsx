@@ -72,7 +72,7 @@ export default function TelemetryView({ filters }) {
     const {
         domain, buildWheelHandler, handleMouseDown,
         handleMouseMove, handleMouseUp, resetZoom,
-        zoomPercent, pixelToDistance,
+        zoomPercent, 
     } = useChartZoom(data?.maxDistance ?? 0);
 
     // Filtra los datos al rango visible con un pequeño buffer para evitar cortes

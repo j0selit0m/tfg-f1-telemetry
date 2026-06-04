@@ -1,6 +1,5 @@
 """Tests unitarios de utils/formatting.py."""
 
-import pytest
 import pandas as pd
 
 from utils.formatting import format_timedelta, normalize_hex, lighten_color

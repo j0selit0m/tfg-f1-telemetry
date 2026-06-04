@@ -267,7 +267,11 @@ def build_laps_prompt(request: LapsAnalysisRequest) -> str:
 
     if session_type == "race":
         instructions = """
-Using ALL the lap data above AND your knowledge of this specific event:
+Using ONLY the lap data provided above:
+Do not invent or assume any incidents, safety car periods, or events
+that are not explicitly present in the data. If no SC or VSC laps are
+indicated, do not mention any. Use your knowledge of the circuit only
+for brief general context, never to assert specific race incidents.
 1. Start with the Grand Prix name, year and circuit name.
 2. Walk through the key moments: position changes, pit stops, SC/VSC periods
    and pace evolution across the race.

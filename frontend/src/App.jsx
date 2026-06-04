@@ -24,14 +24,8 @@ export default function App() {
   const [activeFilters, setActiveFilters] = useState(null);
   const [activeTab, setActiveTab] = useState(TABS[0].id);
 
-  // Lazy mount: solo se montan las pestañas visitadas al menos una vez.
-  // Evita fetches en paralelo al pulsar Run Analysis y mantiene en memoria
-  // las ya visitadas para que el cambio entre tabs sea instantáneo.
-  const [visitedTabs, setVisitedTabs] = useState(new Set([TABS[0].id]));
-
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
-    setVisitedTabs(prev => new Set(prev).add(tabId));
   };
 
   return (
@@ -43,11 +37,10 @@ export default function App() {
         <Header filters={activeFilters} />
         <TabNav tabs={TABS} activeTab={activeTab} onChange={handleTabChange} />
 
-        {/* Las pestañas no visitadas no se montan; las visitadas permanecen
-                    montadas y se ocultan con display:none cuando no son la activa. */}
+        {/* Todas las pestañas se montan al iniciar la app y se ocultan con
+    display:none cuando no son la activa, manteniendo su estado en memoria. */}
         <main className="flex-1 overflow-y-auto">
           {TABS.map(tab => {
-            if (!visitedTabs.has(tab.id)) return null;
             const TabComponent = tab.component;
             return (
               <div
