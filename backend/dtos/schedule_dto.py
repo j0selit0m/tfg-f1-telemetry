@@ -39,5 +39,5 @@ class DriversResponseDTO(BaseModel):
 
     drivers: list[DriverDTO]
     compounds: dict[str, str] = Field(
-        ..., description="Mapa compuesto → color HEX oficial F1"
+        ..., description="Mapa compuesto -> color HEX oficial F1"
     )

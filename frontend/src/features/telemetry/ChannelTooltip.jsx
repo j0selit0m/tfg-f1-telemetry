@@ -51,10 +51,13 @@ const ChannelTooltip = forwardRef(function ChannelTooltip(
             </div>
             {driverKeys.map(key => {
                 const code = drivers?.[key]?.driverCode ?? key.split('_')[0];
+                const session = drivers?.[key]?.session ?? '';
+                const lapNumber = drivers?.[key]?.lapNumber ?? '';
                 const color = getDriverColor(key);
                 return (
-                    <div key={key} className="flex items-center gap-3">
-                        <span className="font-black w-8" style={{ color }}>{code}</span>
+                    <div key={key} className="flex items-center gap-2">
+                        <span className="font-black" style={{ color }}>{code}</span>
+                        <span className="text-gray-300 text-[11px]">{session} L{lapNumber}</span>
                         <span
                             ref={el => { valueRefs.current[key] = el; }}
                             className="text-white font-bold ml-auto"

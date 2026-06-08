@@ -25,7 +25,6 @@ export function useLapData(filters) {
             .catch(err => { if (err.name !== 'AbortError') setError(err.message ?? 'Unknown error'); })
             .finally(() => setIsLoading(false));
         return () => ctrl.abort();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filters?.year, filters?.round, filters?.session, filters?.driver, tick]);
 
     return { data, isLoading, error, refetch };

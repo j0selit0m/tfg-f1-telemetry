@@ -2,7 +2,7 @@
 Lógica de negocio del dominio de vueltas.
 
 Función pública principal:
-    build_laps_response() → LapsResponseDTO
+    build_laps_response()  -> LapsResponseDTO
 """
 
 import pandas as pd

@@ -18,8 +18,8 @@ export class DriverDTO {
     constructor(raw = {}) {
         this.abbreviation = raw.abbreviation ?? '';
         this.fullName = raw.full_name ?? '';
-        // driverColor → líneas de gráficas (color individual del piloto)
-        // teamColor   → elementos UI del sidebar (color de escudería)
+        // driverColor -> líneas de gráficas (color individual del piloto)
+        // teamColor   -> elementos UI del sidebar (color de escudería)
         this.driverColor = raw.driver_color ?? '#FFFFFF';
         this.teamColor = raw.team_color ?? '#FFFFFF';
     }

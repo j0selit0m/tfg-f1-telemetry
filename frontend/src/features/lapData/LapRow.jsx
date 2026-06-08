@@ -5,12 +5,12 @@ const COMPOUND_LETTERS = { SOFT: 'S', MEDIUM: 'M', HARD: 'H', INTERMEDIATE: 'I',
 
 // LEDs de color para cada código de estado de pista.
 // Códigos según la API oficial de FastF1:
-//   '1' = Track clear       → verde
-//   '2' = Yellow flag       → amarillo
-//   '4' = Safety Car        → naranja sólido
-//   '5' = Red Flag          → rojo
-//   '6' = VSC deployed      → morado
-//   '7' = VSC ending        → cyan parpadeante
+//   '1' = Track clear       -> verde
+//   '2' = Yellow flag       -> amarillo
+//   '4' = Safety Car        -> naranja sólido
+//   '5' = Red Flag          -> rojo
+//   '6' = VSC deployed      -> morado
+//   '7' = VSC ending        -> cyan parpadeante
 function TrackStatusDots({ trackStatus }) {
     if (!trackStatus) return null;
 

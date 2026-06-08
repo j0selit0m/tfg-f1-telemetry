@@ -23,7 +23,7 @@ export class LapEntryDTO {
 export class LapRowDTO {
     constructor(raw = {}) {
         this.lapNumber = raw.lap_number ?? 0;
-        // entries: mapa piloto → LapEntryDTO | null
+        // entries: mapa piloto -> LapEntryDTO | null
         this.entries = Object.fromEntries(
             Object.entries(raw.entries ?? {}).map(([driver, entry]) => [
                 driver,

@@ -52,7 +52,7 @@ class LapRowDTO(BaseModel):
     lap_number: int
     entries: dict[str, LapDTO | None] = Field(
         ...,
-        description="Mapa abbreviation → LapDTO. None si el piloto no tiene dato para esa vuelta.",
+        description="Mapa abbreviation -> LapDTO. None si el piloto no tiene dato para esa vuelta.",
     )
 
 
@@ -110,7 +110,7 @@ class SummaryResponseDTO(BaseModel):
     drivers: list[str] = Field(..., description="Pilotos en el orden del request")
     summaries: dict[str, DriverSummaryDTO | None] = Field(
         ...,
-        description="Mapa abbreviation → DriverSummaryDTO. None si el piloto no tiene datos válidos.",
+        description="Mapa abbreviation -> DriverSummaryDTO. None si el piloto no tiene datos válidos.",
     )
 
 
@@ -155,7 +155,7 @@ class StintEntryDTO(BaseModel):
     stint_number: int
     drivers: dict[str, StintDriverDTO | None] = Field(
         ...,
-        description="Mapa abbreviation → StintDriverDTO. None si el piloto no tiene ese stint.",
+        description="Mapa abbreviation -> StintDriverDTO. None si el piloto no tiene ese stint.",
     )
 
 

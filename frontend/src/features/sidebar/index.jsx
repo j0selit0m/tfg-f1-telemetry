@@ -6,6 +6,8 @@ import DriverGrid from './DriverGrid';
 import DriverCard from './DriverCard';
 import FilterSelect from './FilterSelect';
 
+import logo from '../../assets/logo.png'
+
 const AVAILABLE_YEARS = [2026, 2025, 2024, 2023, 2022, 2021, 2020];
 
 export default function SidebarFilter({ onFilterReady }) {
@@ -22,7 +24,7 @@ export default function SidebarFilter({ onFilterReady }) {
     } = useF1SessionData();
 
     return (
-        <aside className="w-80 min-h-screen p-5 bg-gradient-to-b from-gray-900 via-gray-800 to-black border-r-4 border-red-700 shadow-2xl flex flex-col font-sans overflow-y-auto overflow-x-hidden">
+        <aside className="w-90 min-h-screen p-5 bg-gradient-to-b from-gray-900 via-gray-800 to-black border-r-4 border-red-700 shadow-2xl flex flex-col font-sans overflow-y-auto overflow-x-hidden">
 
             <Branding />
 
@@ -91,9 +93,11 @@ export default function SidebarFilter({ onFilterReady }) {
 function Branding() {
     return (
         <div className="mb-6 border-b-2 border-gray-600 pb-4 flex items-center gap-3">
-            <div className="w-10 h-10 border border-gray-600 border-dashed rounded-sm flex items-center justify-center shrink-0">
-                <span className="text-xs font-black text-gray-600">PW</span>
-            </div>
+            <img
+                src={logo}
+                alt="PitWall logo"
+                className="w-20 h-20 object-contain shrink-0"
+            />
             <h2 className="text-5xl font-extrabold italic tracking-wider text-white drop-shadow-md leading-none">
                 <span className="text-white">Pit</span>
                 <span className="text-red-600">Wall</span>

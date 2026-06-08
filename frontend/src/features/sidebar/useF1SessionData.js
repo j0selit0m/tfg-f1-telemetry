@@ -1,4 +1,4 @@
-// Hook que orquesta las 3 llamadas en cascada: año → eventos → sesiones → pilotos.
+// Hook que orquesta las 3 llamadas en cascada: año -> eventos -> sesiones -> pilotos.
 // Cada cascada cancela la petición anterior con AbortController para evitar
 // race conditions al cambiar filtros rápidamente.
 
@@ -21,7 +21,7 @@ export function useF1SessionData() {
     const [loadingSessions, setLoadingSessions] = useState(false);
     const [loadingDrivers, setLoadingDrivers] = useState(false);
 
-    // --- Cascada 1: año → grandes premios ---
+    // --- Cascada 1: año -> grandes premios ---
 
     useEffect(() => {
         if (!selectedYear) return;
@@ -36,7 +36,7 @@ export function useF1SessionData() {
         return () => ctrl.abort();
     }, [selectedYear]);
 
-    // --- Cascada 2: gran premio → sesiones disponibles ---
+    // --- Cascada 2: gran premio -> sesiones disponibles ---
 
     useEffect(() => {
         if (!selectedYear || !selectedEvent) return;
@@ -51,7 +51,7 @@ export function useF1SessionData() {
         return () => ctrl.abort();
     }, [selectedYear, selectedEvent]);
 
-    // --- Cascada 3: sesión → pilotos y compuestos ---
+    // --- Cascada 3: sesión -> pilotos y compuestos ---
 
     useEffect(() => {
         if (!selectedYear || !selectedEvent || !selectedSession) return;

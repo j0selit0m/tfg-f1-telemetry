@@ -2,8 +2,8 @@
 Tests unitarios de core/ai_prompts.py.
 
 Cubre las funciones helper puras del módulo de análisis con IA:
-    _session_context() → clasifica el tipo de sesión
-    _driver_label()    → construye la etiqueta de piloto con nombre
+    _session_context() -> clasifica el tipo de sesión
+    _driver_label()    -> construye la etiqueta de piloto con nombre
 
 Son funciones sin efectos secundarios ni dependencias externas,
 por lo que no requieren mocks ni fixtures.

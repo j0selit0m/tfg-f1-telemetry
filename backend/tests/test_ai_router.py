@@ -2,9 +2,9 @@
 Tests del router de análisis con IA.
 
 Cubre los tres endpoints del módulo de análisis inteligente:
-    POST /api/ai/summary-analysis  → análisis de estadísticas de resumen
-    POST /api/ai/stints-analysis   → análisis de métricas de stints
-    POST /api/ai/laps-analysis     → análisis narrativo de datos de vueltas
+    POST /api/ai/summary-analysis  -> análisis de estadísticas de resumen
+    POST /api/ai/stints-analysis   -> análisis de métricas de stints
+    POST /api/ai/laps-analysis     -> análisis narrativo de datos de vueltas
 
 Gemini se mockea en todos los tests para evitar llamadas reales a la API
 y garantizar tests deterministas y rápidos.

@@ -2,9 +2,9 @@
 Router de filtros de sesión (SidebarFilter del frontend).
 
 Endpoints:
-    GET /api/schedule/{year}                                   → calendario
-    GET /api/schedule/{year}/{event_name}/sessions             → sesiones del GP
-    GET /api/session/{year}/{event_name}/{session_name}/drivers → pilotos y colores
+    GET /api/schedule/{year}                                    -> calendario
+    GET /api/schedule/{year}/{event_name}/sessions              -> sesiones del GP
+    GET /api/session/{year}/{event_name}/{session_name}/drivers -> pilotos y colores
 """
 
 import asyncio

@@ -3,8 +3,8 @@ Caché en memoria de sesiones de FastF1.
 
 Expone dos loaders con sus propias cachés independientes:
 
-    load_session_metadata()       → sin telemetría  (~1-3 s)
-    load_session_with_telemetry() → con telemetría   (~3-8 s)
+    load_session_metadata()       -> sin telemetría  (~1-3 s)
+    load_session_with_telemetry() -> con telemetría   (~3-8 s)
 
 Mantener dos cachés separadas evita que una petición al endpoint de análisis
 (que no necesita telemetría) fuerce la carga pesada, y al revés: si primero

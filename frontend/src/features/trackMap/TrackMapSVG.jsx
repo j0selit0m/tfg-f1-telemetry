@@ -87,7 +87,7 @@ export default function TrackMapSVG({ data, colorMap }) {
         return { sectorsWon: won, lapTimesMs: times };
     }, [data]);
 
-    // Mapa driver → lapNumber para el tooltip, extraído del DTO
+    // Mapa driver -> lapNumber para el tooltip, extraído del DTO
     const driverLaps = useMemo(() =>
         Object.fromEntries(data.drivers.map(d => [d.driver, d.lapNumber])),
         [data.drivers]
@@ -223,10 +223,10 @@ export default function TrackMapSVG({ data, colorMap }) {
                     )}
 
                     {/* Badges de número de curva desplazados fuera del trazado */}
-                    {(() => {
+                    {
 
 
-                        return data.corners.map(corner => {
+                        data.corners.map(corner => {
                             const { nx, ny } = normalizeXY(corner.x, corner.y, normParams);
                             const label = `${corner.number}${corner.letter}`;
                             const r = label.length > 2 ? 15 : 13;
@@ -249,8 +249,7 @@ export default function TrackMapSVG({ data, colorMap }) {
                                     >{label}</text>
                                 </g>
                             );
-                        });
-                    })()}
+                        })}
 
                     {/* Zonas invisibles de hover por microsector para activar el tooltip */}
                     {sectorGroups.map((group, s) => {

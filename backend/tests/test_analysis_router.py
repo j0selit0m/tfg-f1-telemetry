@@ -2,9 +2,9 @@
 Tests del router de análisis — RF-04, RF-05, RF-06.
 
 Cubre los endpoints que alimentan las pestañas principales de PitWall:
-    GET /api/analysis/{year}/{event}/{session}/laps    → RF-04
-    GET /api/analysis/{year}/{event}/{session}/summary → RF-05
-    GET /api/analysis/{year}/{event}/{session}/stints  → RF-06
+    GET /api/analysis/{year}/{event}/{session}/laps    -> RF-04
+    GET /api/analysis/{year}/{event}/{session}/summary -> RF-05
+    GET /api/analysis/{year}/{event}/{session}/stints  -> RF-06
 
 Los services se mockean directamente para desacoplar los tests
 de la lógica de FastF1 y centrarse en el comportamiento del router.
@@ -49,7 +49,6 @@ def mock_summary_response():
     """SummaryResponseDTO simulado con un piloto y estadísticas básicas."""
     return SummaryResponseDTO(
         drivers=["HAM"],
-        fastest_driver=None,
         summaries={
             "HAM": DriverSummaryDTO(
                 best_lap=BestLapDTO(time="1:33.456", lap_number=5),
@@ -229,7 +228,6 @@ class TestGetSummary:
         mock_session = MagicMock()
         mock_response = SummaryResponseDTO(
             drivers=["XXX"],
-            fastest_driver=None,
             summaries={"XXX": None},
         )
         with patch(

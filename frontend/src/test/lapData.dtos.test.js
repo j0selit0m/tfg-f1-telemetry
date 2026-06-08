@@ -1,7 +1,7 @@
 /**
  * Tests unitarios de los DTOs del dominio de datos de vuelta.
  *
- * Verifica que la transformación snake_case → camelCase es correcta
+ * Verifica que la transformación snake_case -> camelCase es correcta
  * y que los valores por defecto se aplican cuando faltan campos.
  * No requiere React ni mocks — son clases JavaScript puras.
  */

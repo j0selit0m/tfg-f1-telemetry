@@ -2,7 +2,7 @@
 Lógica de negocio del dominio de mapa de circuito.
 
 Función pública principal:
-    build_track_response() → TrackMapResponse
+    build_track_response()  -> TrackMapResponse
 
 Metodología de microsectores
 -----------------------------

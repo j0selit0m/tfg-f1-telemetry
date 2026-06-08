@@ -2,9 +2,9 @@
 Tests del router de schedule — RF-01, RF-02, RF-03.
 
 Cubre los endpoints que alimentan el SidebarFilter del frontend:
-    GET /api/schedule/{year}                          → RF-01
-    GET /api/schedule/{year}/{event}/sessions         → RF-02
-    GET /api/session/{year}/{event}/{session}/drivers → RF-03
+    GET /api/schedule/{year}                          -> RF-01
+    GET /api/schedule/{year}/{event}/sessions         -> RF-02
+    GET /api/session/{year}/{event}/{session}/drivers -> RF-03
 
 Todos los tests mockean FastF1 para evitar llamadas reales a la API
 y garantizar que los tests sean reproducibles y rápidos.

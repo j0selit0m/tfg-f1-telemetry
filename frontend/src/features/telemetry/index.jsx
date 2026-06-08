@@ -55,7 +55,6 @@ export default function TelemetryView({ filters }) {
         const defaultRows = availableDrivers.map(d => ({ driver: d, session: filters.session, lap: '' }));
         setRows(defaultRows);
         setDriverParam(buildParamFromRows(defaultRows));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filters?.year, filters?.round, filters?.driver, filters?.session]);
 
     const { data, isLoading, error } = useTelemetry(filters, driverParam);
@@ -111,7 +110,7 @@ export default function TelemetryView({ filters }) {
         // 1) Mover las 6 líneas rojas
         crosshairRefs.current.forEach(ref => ref?.setPercent(pct));
 
-        // 2) Mapear canal → campo del DTO
+        // 2) Mapear canal -> campo del DTO
         const FIELD = {
             speed: 'speed', throttle: 'throttle', brake: 'brake',
             rpm: 'rpm', gear: 'gear', drs: 'drsActive',

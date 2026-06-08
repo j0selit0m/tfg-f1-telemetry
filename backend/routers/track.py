@@ -2,7 +2,7 @@
 Router de mapa de circuito.
 
 Endpoints:
-    GET /api/track/{year}/{event_name}/map → comparativa de 25 microsectores
+    GET /api/track/{year}/{event_name}/map -> comparativa de 25 microsectores
 """
 
 from fastapi import APIRouter, HTTPException, Path, Query

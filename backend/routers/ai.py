@@ -2,9 +2,9 @@
 Router de análisis con IA.
 
 Endpoints:
-    POST /api/ai/summary-analysis  → análisis de estadísticas de resumen
-    POST /api/ai/stints-analysis   → análisis de métricas de stints
-    POST /api/ai/laps-analysis     → análisis narrativo de datos de vueltas
+    POST /api/ai/summary-analysis  -> análisis de estadísticas de resumen
+    POST /api/ai/stints-analysis   -> análisis de métricas de stints
+    POST /api/ai/laps-analysis     -> análisis narrativo de datos de vueltas
 """
 
 from fastapi import APIRouter, HTTPException

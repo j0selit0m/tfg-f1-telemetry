@@ -16,7 +16,7 @@ function CompoundBadge({ compound }) {
     );
 }
 
-// Barra de consistencia: rojo → verde según el valor (0-100)
+// Barra de consistencia: rojo -> verde según el valor (0-100)
 function ConsistencyBar({ value }) {
     const hue = Math.round((value / 100) * 120);
     return (

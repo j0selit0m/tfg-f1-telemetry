@@ -2,7 +2,7 @@
 Lógica de negocio del dominio de análisis de stints.
 
 Función pública principal:
-    build_stints_response() → StintsResponseDTO
+    build_stints_response()  -> StintsResponseDTO
 """
 
 import pandas as pd

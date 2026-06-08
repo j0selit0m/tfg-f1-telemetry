@@ -30,7 +30,6 @@ export function useTelemetry(filters, driverParam) {
                 }
             });
         return () => ctrl.abort();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filters?.year, filters?.round, driverParam]);
 
     return { data, isLoading, error };

@@ -2,7 +2,7 @@
 Router de telemetría de coche.
 
 Endpoints:
-    GET /api/telemetry/{year}/{event_name}/full → telemetría completa de una vuelta
+    GET /api/telemetry/{year}/{event_name}/full -> telemetría completa de una vuelta
 """
 
 from fastapi import APIRouter, HTTPException, Path, Query
@@ -33,9 +33,9 @@ async def get_full_telemetry(
     en una única petición. Si no se especifica vuelta, se usa la más rápida.
 
     **Ejemplos de uso:**
-    - ?drivers=ALO:Race:44,SAI:Race:44 → vuelta 44 de Alonso y Sainz en carrera
-    - ?drivers=VER:Qualifying,NOR:Qualifying → vuelta rápida de ambos en clasificación
-    - ?drivers=ALO:Race:30,HAM:Qualifying → sesiones distintas en la misma petición
+    - ?drivers=ALO:Race:44,SAI:Race:44 -> vuelta 44 de Alonso y Sainz en carrera
+    - ?drivers=VER:Qualifying,NOR:Qualifying -> vuelta rápida de ambos en clasificación
+    - ?drivers=ALO:Race:30,HAM:Qualifying -> sesiones distintas en la misma petición
     """
     try:
         driver_configs = parse_drivers(drivers)

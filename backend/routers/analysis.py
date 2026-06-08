@@ -2,9 +2,9 @@
 Router de análisis de sesión.
 
 Endpoints:
-    GET /api/analysis/{year}/{event_name}/{session_name}/laps    → vueltas agrupadas
-    GET /api/analysis/{year}/{event_name}/{session_name}/summary → estadísticas resumen
-    GET /api/analysis/{year}/{event_name}/{session_name}/stints  → métricas por stint
+    GET /api/analysis/{year}/{event_name}/{session_name}/laps    -> vueltas agrupadas
+    GET /api/analysis/{year}/{event_name}/{session_name}/summary -> estadísticas resumen
+    GET /api/analysis/{year}/{event_name}/{session_name}/stints  -> métricas por stint
 """
 
 from fastapi import APIRouter, HTTPException, Path, Query

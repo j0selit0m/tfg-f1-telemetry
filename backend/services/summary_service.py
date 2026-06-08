@@ -2,7 +2,7 @@
 Lógica de negocio del dominio de estadísticas resumen.
 
 Función pública principal:
-    build_summary_response() → SummaryResponseDTO
+    build_summary_response()  -> SummaryResponseDTO
 """
 
 import pandas as pd

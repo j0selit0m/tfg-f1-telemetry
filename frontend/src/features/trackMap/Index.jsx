@@ -1,5 +1,5 @@
 // Orquestador de la vista de mapa de circuito.
-// Sigue el mismo patrón que TelemetryView: rows → driverParam → fetch → render.
+// Sigue el mismo patrón que TelemetryView: rows -> driverParam -> fetch -> render.
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import LapSelector from '../../components/LapSelector';
@@ -35,7 +35,6 @@ export default function TrackMapView({ filters }) {
         setRows(defaultRows);
         setDriverParam(buildParamFromRows(defaultRows));
         setSessionError('');
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filters?.year, filters?.round, filters?.driver, filters?.session]);
 
     const { data, isLoading, error } = useTrackMap(filters, driverParam);
@@ -43,8 +42,7 @@ export default function TrackMapView({ filters }) {
     const handleLoad = useCallback(() => {
         const sessions = [...new Set(rows.map(r => r.session))];
         if (sessions.length > 1) {
-            setSessionError(`Todos los pilotos deben estar en la misma sesión (${sessions.join(', ')}).`);
-            return;
+            setSessionError(`All drivers must belong to the same session. Found: ${sessions.join(', ')}`); return;
         }
         setSessionError('');
         setDriverParam(buildParamFromRows(rows));

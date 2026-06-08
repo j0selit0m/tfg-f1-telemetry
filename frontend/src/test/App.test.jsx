@@ -77,10 +77,22 @@ describe('App', () => {
         expect(screen.getByTestId('lap-data-view')).toBeInTheDocument()
     })
 
-    it('cambia a Session Summary al pulsar su pestaña', () => {
+    it('cambia a Stint Analysis al pulsar su pestaña', () => {
         render(<App />)
-        fireEvent.click(screen.getByRole('button', { name: /Session Summary/i }))
-        expect(screen.getByTestId('summary-view')).toBeVisible()
+        fireEvent.click(screen.getByRole('button', { name: /Stint Analysis/i }))
+        expect(screen.getByTestId('stints-view')).toBeVisible()
+    })
+
+    it('cambia a Telemetry al pulsar su pestaña', () => {
+        render(<App />)
+        fireEvent.click(screen.getByRole('button', { name: /Telemetry/i }))
+        expect(screen.getByTestId('telemetry-view')).toBeVisible()
+    })
+
+    it('cambia a Track Map al pulsar su pestaña', () => {
+        render(<App />)
+        fireEvent.click(screen.getByRole('button', { name: /Track Map/i }))
+        expect(screen.getByTestId('track-map-view')).toBeVisible()
     })
 
     it('el Header muestra el mensaje por defecto sin filtros activos', () => {

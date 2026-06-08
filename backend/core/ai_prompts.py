@@ -66,7 +66,7 @@ def build_summary_prompt(request: SummaryAnalysisRequest) -> str:
         f"- {_driver_label(d.driver_code, request.driver_names)}: personal best lap {d.best_lap or 'N/A'} (lap #{d.best_lap_number or '?'}), "
         f"average {d.average or 'N/A'}, median {d.median or 'N/A'}, "
         f"std dev {d.std_dev or 'N/A'}, consistency {d.consistency:.1f}%, "
-        f"{d.valid_laps} valid laps, compounds used: {' → '.join(d.strategy)}"
+        f"{d.valid_laps} valid laps, compounds used: {' -> '.join(d.strategy)}"
         for d in request.drivers
     )
 
@@ -232,6 +232,20 @@ FORMAT:
 """
 
 
+def _parse_track_status(status: str | None) -> str:
+    if not status:
+        return "clear"
+    if "5" in status:
+        return "red flag"
+    if "6" in status:
+        return "VSC"
+    if "4" in status:
+        return "SC"
+    if "2" in status:
+        return "yellow"
+    return "clear"
+
+
 def build_laps_prompt(request: LapsAnalysisRequest) -> str:
     """Construye el prompt para analizar los datos de vueltas de sesión."""
     session_type = _session_context(request.session_name)
@@ -251,12 +265,7 @@ def build_laps_prompt(request: LapsAnalysisRequest) -> str:
                 flags.append("PIT OUT")
             if entry.is_fastest_lap:
                 flags.append("FASTEST LAP")
-            status = {
-                "1": "clear",
-                "2": "yellow",
-                "4": "SC",
-                "6": "VSC",
-            }.get(entry.track_status or "1", entry.track_status or "")
+            status = _parse_track_status(entry.track_status)
             flag_str = f" [{', '.join(flags)}]" if flags else ""
             laps_block += (
                 f"  {label}: {entry.lap_time or 'N/A'} "
@@ -267,20 +276,28 @@ def build_laps_prompt(request: LapsAnalysisRequest) -> str:
 
     if session_type == "race":
         instructions = """
-Using ONLY the lap data provided above:
-Do not invent or assume any incidents, safety car periods, or events
-that are not explicitly present in the data. If no SC or VSC laps are
-indicated, do not mention any. Use your knowledge of the circuit only
-for brief general context, never to assert specific race incidents.
+Using ONLY the lap data provided above. Every fact you state must be
+directly supported by the data. Do not invent, assume or infer any
+specific incidents, pit stops, safety car periods, or events beyond
+what is explicitly present in the data fields.
 1. Start with the Grand Prix name, year and circuit name.
-2. Walk through the key moments: position changes, pit stops, SC/VSC periods
-   and pace evolution across the race.
-   A pit stop is when a driver enters the pit lane to change tyres.
-   A Safety Car neutralises the race behind a pace car after an incident.
-   A Virtual Safety Car slows all cars electronically without a physical car.
-   If SC or VSC periods appear, use your knowledge to suggest what may have
-   caused them — but phrase it as a suggestion, not a confirmed fact.
-3. Comment on sector times if there are notable differences between drivers.
+2. Walk through the key moments strictly based on the data:
+   - Pit stops: only mention them if pit_in=True appears in the data.
+     A pit stop is when a driver enters the pit lane to change tyres.
+    - SC/VSC: only mention them if laps marked [SC] or [VSC] appear in the data.
+     A Safety Car neutralises the race behind a pace car after an incident.
+     A Virtual Safety Car slows all cars electronically without a physical car.
+   - Yellow flags: if many laps show status [yellow], mention there were
+  yellow flag periods which slow drivers in a specific sector, often
+  due to a car off track or debris. Do not confuse with SC or VSC.
+   - Red flag: if laps marked [red flag] appear in the data, or if a driver
+  completed significantly fewer laps than expected with no pit stops recorded,
+  this may suggest the session was interrupted by a red flag. A red flag stops
+  the race completely, usually due to a serious incident or dangerous conditions
+  on track. Drivers return to the pit lane and the race may be restarted or
+  abandoned. Do not speculate about who caused it or what the incident was.
+   - Position changes: only based on the position field in the data.
+3. Comment on sector times only if there are notable differences in the data.
 4. If a driver completed significantly fewer laps than expected, suggest
    they may have retired without asserting it as certain.
 5. Close with a summary of what happened for these drivers."""

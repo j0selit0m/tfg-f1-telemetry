@@ -4,7 +4,7 @@ Cliente asíncrono para la API de Google Gemini 2.5 Flash.
 Usa httpx en lugar del SDK oficial para evitar dependencias pesadas.
 Configuración unificada para todos los análisis de la aplicación:
     - temperature: 0.2  (respuestas precisas y consistentes)
-    - maxOutputTokens: 1500
+    - maxOutputTokens: 2048
     - thinkingBudget: 1024 (razonamiento moderado antes de responder)
 
 Referencia:
@@ -38,7 +38,7 @@ async def generate_content(prompt: str) -> str:
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
             "temperature": 0.2,
-            "maxOutputTokens": 2048,
+            "maxOutputTokens": 4096,
             "thinkingConfig": {
                 "thinkingLevel": "low"  # minimal, low, medium, high
             },

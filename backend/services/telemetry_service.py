@@ -2,7 +2,7 @@
 Lógica de negocio del dominio de telemetría.
 
 Función pública principal:
-    build_telemetry_response() → TelemetryResponse
+    build_telemetry_response()  -> TelemetryResponse
 """
 
 import pandas as pd
@@ -50,8 +50,8 @@ def parse_drivers(drivers_param: str) -> list[dict]:
     """Convierte el query param 'drivers' en una lista de configuraciones.
 
     Formatos aceptados:
-        ALO:Race:44  → piloto, sesión y vuelta específica
-        ALO:Race     → piloto y sesión; usará la vuelta más rápida
+        ALO:Race:44  -> piloto, sesión y vuelta específica
+        ALO:Race     -> piloto y sesión; usará la vuelta más rápida
 
     Args:
         drivers_param: String crudo del query param, ej: "ALO:Race:44,SAI:Race:44".
@@ -107,7 +107,7 @@ def build_telemetry_response(
 
     Args:
         driver_configs: Lista producida por parse_drivers().
-        sessions:       Mapa session_name → Session ya cargada con telemetría.
+        sessions:       Mapa session_name -> Session ya cargada con telemetría.
 
     Returns:
         TelemetryResponse con curvas del circuito y datos de cada piloto.
