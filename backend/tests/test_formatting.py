@@ -92,7 +92,6 @@ class TestLightenColor:
         assert lighten_color("#ffffff", factor=0.4) == "#ffffff"
 
     def test_resultado_es_mas_claro(self):
-        original = "40, 40, 40"
         result = lighten_color("#282828", factor=0.5)
         r = int(result[1:3], 16)
         g = int(result[3:5], 16)

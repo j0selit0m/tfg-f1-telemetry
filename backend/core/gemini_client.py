@@ -4,8 +4,8 @@ Cliente asíncrono para la API de Google Gemini 2.5 Flash.
 Usa httpx en lugar del SDK oficial para evitar dependencias pesadas.
 Configuración unificada para todos los análisis de la aplicación:
     - temperature: 0.2  (respuestas precisas y consistentes)
-    - maxOutputTokens: 2048
-    - thinkingBudget: 1024 (razonamiento moderado antes de responder)
+    - maxOutputTokens: 4096
+    - thinkingBudget: low (razonamiento moderado antes de responder)
 
 Referencia:
     https://ai.google.dev/gemini-api/docs/text-generation
