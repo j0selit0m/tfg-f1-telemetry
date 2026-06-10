@@ -1,0 +1,32 @@
+# Docker Compose para PitWall
+# Levanta backend (FastAPI) y frontend (Nginx) con un solo comando.
+# Uso: docker compose up --build
+
+services:
+
+  # Backend: FastAPI + Uvicorn (puerto 8000)
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    volumes:
+      # Volumen persistente para la caché de FastF1.
+      # Los datos descargados sobreviven a reinicios del contenedor.
+      - fastf1_cache:/app/fastf1_cache_local
+
+  # Frontend: Build de React servido por Nginx (puerto 3000)
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE: http://localhost:8000/api
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+# Volumen gestionado por Docker para la caché de FastF1
+volumes:
+  fastf1_cache:
