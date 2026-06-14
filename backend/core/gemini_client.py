@@ -5,7 +5,7 @@ Usa httpx en lugar del SDK oficial para evitar dependencias pesadas.
 Configuración unificada para todos los análisis de la aplicación:
     - temperature: 0.2  (respuestas precisas y consistentes)
     - maxOutputTokens: 4096
-    - thinkingBudget: low (razonamiento moderado antes de responder)
+    - thinkingLevel: low (razonamiento moderado antes de responder)
 
 Referencia:
     https://ai.google.dev/gemini-api/docs/text-generation

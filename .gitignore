@@ -1,8 +1,4 @@
-# ==============================
-# GIT - TFG FORMULA 1
-# ==============================
-
-# 1. Backend (Python / FastAPI / FastF1)
+# - Backend (Python / FastAPI / FastF1)
 backend/venv/
 __pycache__/
 *.pyc
@@ -35,13 +31,13 @@ build/
 dist/
 *.egg-info/
 
-# 2. Frontend (Node / Vite / React)
+# - Frontend (Node / Vite / React)
 frontend/node_modules/
 frontend/dist/
 frontend/dist-ssr/
 *.local
 
-# 3. Entorno de desarrollo (IDEs)
+# - Entorno de desarrollo (IDEs)
 .vscode/
 .vs/
 .idea/
@@ -49,18 +45,18 @@ frontend/dist-ssr/
 *.swp
 *.swo
 
-# 4. Archivos del sistema operativo
+# - Archivos del sistema operativo
 Thumbs.db
 Desktop.ini
 .DS_Store
 
-# 5. Logs y bases de datos locales
+# - Logs y bases de datos locales
 *.log
 *.sqlite
 *.sqlite3
 *.db
 
-# 6. Claves y certificados (preventivo)
+# - Claves y certificados (preventivo)
 *.pem
 *.key
 *.cert

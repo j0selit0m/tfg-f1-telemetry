@@ -3,9 +3,6 @@
 
 export const CHART_MARGIN = { top: 32, right: 8, left: 30, bottom: 20 };
 
-// Margen inferior compacto para charts sin eje X (solo el último lo muestra).
-export const CHART_MARGIN_BOTTOM_COMPACT = 6;
-
 // Ancho fijo del eje Y. Auto-width de Recharts daba ~60px empíricamente
 // (30 margen externo + 60 eje Y = 90px de offset total medido en browser).
 export const Y_AXIS_WIDTH = 60;

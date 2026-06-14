@@ -23,6 +23,11 @@ from routers.analysis import router as analysis_router
 from routers.track import router as track_router
 from routers.ai import router as ai_router
 
+
+import logging
+
+logging.basicConfig(level=logging.INFO)
+
 # --- Caché de FastF1 ---
 # Se inicializa al arrancar el servidor, antes de registrar ninguna ruta.
 
