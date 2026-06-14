@@ -69,4 +69,4 @@ CORS_ORIGINS: list[str] = [
 # La key se obtiene en https://aistudio.google.com/apikey (plan gratuito).
 
 GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")

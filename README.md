@@ -14,7 +14,7 @@ Frente a alternativas web como Tracing Insights, esta solución ofrece:
 
 - **Backend**: Python 3.11+, FastAPI, FastF1, Pydantic v2, Uvicorn
 - **Frontend**: React 19, Vite, Tailwind CSS, Recharts
-- **IA**: Google Gemini Flash Lite (API REST vía httpx)
+- **IA**: Google Gemini 3.1 Flash Lite (API REST vía httpx)
 - **Infraestructura**: Docker, Docker Compose, Nginx
 
 ## Estructura del proyecto

@@ -1,5 +1,5 @@
 """
-Cliente asíncrono para la API de Google Gemini 2.5 Flash.
+Cliente asíncrono para la API de Google Gemini 3.1 Flash-Lite.
 
 Usa httpx en lugar del SDK oficial para evitar dependencias pesadas.
 Configuración unificada para todos los análisis de la aplicación:
